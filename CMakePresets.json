@@ -1,0 +1,73 @@
+{
+    "version": 10,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/bin/${presetName}",
+                "CMAKE_VERBOSE_MAKEFILE": "ON"
+            }
+        },
+        {
+            "name": "ninja",
+            "hidden": true,
+            "generator": "Ninja",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "clang",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_LINKER_TYPE": "LLD",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_C_EXTENSIONS": "OFF",
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "CMAKE_C_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+                "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "d0edc3af-4c50-42ea-a356-e2862fe7a444",
+                "CMAKE_CXX_MODULE_STD": "ON"
+            }
+        },
+        {
+            "name": "debug",
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS": "-O3 -Wall -stdlib=libstdc++ -rdynamic"
+            },
+            "inherits": [
+                "base",
+                "ninja",
+                "clang"
+            ]
+        },
+        {
+            "name": "release",
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS": "-O3 -Wall -stdlib=libstdc++ -rdynamic"
+            },
+            "inherits": [
+                "base",
+                "ninja",
+                "clang"
+            ]
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug"
+        },
+        {
+            "name": "release",
+            "configurePreset": "release"
+        }
+    ]
+}

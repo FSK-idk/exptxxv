@@ -1,0 +1,185 @@
+#!/bin/luajit
+
+
+local exec_ = function(cmd)
+    local code = os.execute(table.concat(cmd, ' '))
+    if code ~= 0 then os.exit(code) end
+end
+
+local exec2_ = function(cmd)
+    return os.execute(table.concat(cmd, ' '))
+end
+
+local clear_ = function()
+    exec_ { 'clear' }
+end
+
+local clean_ = function()
+    exec_ { 'rm', '-rf', '.cache', 'build', 'bin' }
+end
+
+local copy_compile_commands_ = function(preset)
+    exec2_ {
+        'cp',
+        'build/' .. preset .. '/compile_commands.json',
+        'build/compile_commands.json',
+    }
+end
+
+local setup_preset_ = function(preset)
+    exec_ {
+        'cmake',
+        '--preset ' .. preset,
+        '-Wno-dev',
+    }
+end
+
+local build_ = function(preset, project)
+    if project == nil then
+        exec_ {
+            'cmake',
+            '--build',
+            '--preset ' .. preset,
+        }
+    else
+        exec_ {
+            'cmake',
+            '--build',
+            '--preset ' .. preset,
+            '--target ' .. project,
+        }
+    end
+end
+
+local run_ = function(preset, project)
+    exec_ {
+        'bin/' .. preset .. '/' .. project,
+    }
+end
+
+local exit_ = function()
+    print('Usage:')
+    print('  proj [clean | build | run] [project] [--release | --debug]')
+    os.exit(-1)
+end
+
+local args = { ... }
+
+local opts = {
+    command = nil,
+    project = nil,
+    flags = {},
+}
+
+if #args == 0 then
+    print('No arguments')
+    exit_()
+end
+
+local available_commands = {
+    ['clean'] = true,
+    ['build'] = true,
+    ['run'] = true,
+}
+
+local available_projects = {
+    ['xxvc'] = true,
+}
+
+local available_flags = {
+    ['debug'] = true,
+    ['release'] = true,
+}
+
+if #args >= 1 then
+    if available_commands[args[1]] ~= true then
+        print('Invalid command')
+        exit_()
+    end
+    if args[1] == 'clean' and #args ~= 1 then
+        print('Too much arguments')
+        exit_()
+    end
+    opts.command = args[1]
+end
+
+if #args >= 2 then
+    if args[2]:sub(1, 2) ~= '--' then
+        if available_projects[args[2]] ~= true then
+            print('Invalid project')
+            exit_()
+        end
+        opts.project = args[2]
+    else
+        local flag = args[2]:sub(3)
+        if available_flags[flag] ~= true then
+            print('Invalid flag')
+            exit_()
+        end
+        opts.flags[flag] = true
+    end
+end
+
+if #args >= 3 then
+    if args[2]:sub(1, 2) == '--' then
+        print('Only one flag supported')
+            exit_()
+    end
+    local flag = args[3]:sub(3)
+    if available_flags[flag] ~= true then
+        print('Invalid flag')
+            exit_()
+    end
+    opts.flags[flag] = true
+end
+
+if #args >= 4 then
+    print('Too much arguments')
+    exit_()
+end
+
+if opts.command == 'clean' then
+    clean_()
+    os.exit(0)
+end
+
+if opts.flags['release'] ~= true and opts.flags['debug'] ~= true then
+    opts.flags['debug'] =  true
+end
+
+local build = function()
+    clear_()
+    local preset = 'debug'
+    if opts.flags['release'] == true then
+        preset = 'release'
+    end
+    setup_preset_(preset)
+    copy_compile_commands_(preset)
+    build_(preset, opts.project)
+end
+
+local run = function()
+    clear_()
+    local preset = 'debug'
+    if opts.flags['release'] == true then
+        preset = 'release'
+    end
+    run_(preset, opts.project)
+end
+
+if opts.command == 'build' then
+    build()
+end
+
+if opts.command == 'run' then
+    if opts.project == nil then
+        opts.project = 'xxvc'
+    end
+    if opts.project ~= 'xxvc' then
+        print('Nothing to run')
+        exit_()
+    end
+
+    build()
+    run()
+end

@@ -1,0 +1,61 @@
+export module lexer;
+
+import std;
+
+import types;
+import tokens;
+
+
+export
+class Lexer {
+public:
+    Lexer() {}
+
+    auto tokenize(std::string const& program) -> std::vector<std::unique_ptr<Token>> {
+        std::vector<std::unique_ptr<Token>> tokens;
+
+        u64 size = program.size();
+
+        u64 i = 0;
+        while (i < size) {
+            // spaces
+            while (i < size && std::isspace(program[i])) ++i;
+            if (i == size) break;
+
+            // identifier or reserved
+            if (std::isalpha(program[i])) {
+                u64 j = i + 1; while (j < size && std::isalnum(program[j])) ++j;
+                std::string_view name = std::string_view{ program.data() + i, program.data() + j };
+                if      (name == "fn")     { tokens.emplace_back(Token::Create(TokenType::eFn)); }
+                else if (name == "extern") { tokens.emplace_back(Token::Create(TokenType::eExtern)); }
+                else if (name == "return") { tokens.emplace_back(Token::Create(TokenType::eReturn)); }
+                else                       { tokens.emplace_back(IdentifierToken::Create(std::string(name))); }
+                i = j; continue;
+            }
+
+            // number
+            if (std::isdigit(program[i])) {
+                // TODO: handle multiple dots e.g. '123.123.123'
+                u64 j = i + 1; while (j < size && (std::isdigit(program[j]) || program[j] == '.')) ++j;
+                f64 value; std::from_chars(program.data() + i, program.data() + j, value);
+                tokens.emplace_back(NumberToken::Create(value));
+                i = j; continue;
+            }
+
+            // special
+            if      (program[i] == ':') { tokens.emplace_back(Token::Create(TokenType::eColon)); }
+            else if (program[i] == ';') { tokens.emplace_back(Token::Create(TokenType::eSemicolon)); }
+            else if (program[i] == '(') { tokens.emplace_back(Token::Create(TokenType::eLeftRound)); }
+            else if (program[i] == ')') { tokens.emplace_back(Token::Create(TokenType::eRightRound)); }
+            else if (program[i] == '{') { tokens.emplace_back(Token::Create(TokenType::eLeftCurly)); }
+            else if (program[i] == '}') { tokens.emplace_back(Token::Create(TokenType::eRightCurly)); }
+            else                        { tokens.emplace_back(Token::Create(TokenType::eUnknown)); }
+
+            ++i;
+        }
+
+        tokens.emplace_back(Token::Create(TokenType::eEof));
+
+        return tokens;
+    };
+};

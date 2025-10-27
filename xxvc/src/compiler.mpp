@@ -1,0 +1,24 @@
+export module compiler;
+
+import std;
+import tokens;
+import lexer;
+
+
+export
+class Compiler {
+public:
+    Compiler() {}
+
+    auto exec(std::string program) -> void {
+        Lexer lexer;
+
+        std::vector<std::unique_ptr<Token>> tokens = lexer.tokenize(program);
+
+        for (auto& token : tokens) {
+            printToken(token.get());
+            std::print(" ");
+        }
+        std::println();
+    }
+};

@@ -1,0 +1,71 @@
+export module tokens;
+
+import std;
+
+import types;
+
+
+export
+enum class TokenType {
+    eNumber,
+    eIdentifier,
+
+    // special
+    eEof,
+    eUnknown,
+    eColon,
+    eSemicolon,
+    eLeftRound,
+    eRightRound,
+    eLeftCurly,
+    eRightCurly,
+    
+    // reserved
+    eFn,
+    eExtern,
+    eReturn,
+};
+
+export
+struct Token {
+    TokenType type;
+    static auto Create(TokenType type) -> std::unique_ptr<Token> {
+        return std::make_unique<Token>(Token{ type });
+    }
+};
+
+export
+struct IdentifierToken : Token {
+    std::string name;
+    static auto Create(std::string name) -> std::unique_ptr<IdentifierToken> {
+        return std::make_unique<IdentifierToken>(
+            IdentifierToken{ { TokenType::eIdentifier }, std::move(name) });
+    }
+};
+
+export
+struct NumberToken : Token {
+    f64 value;
+    static auto Create(f64 value) -> std::unique_ptr<NumberToken> {
+        return std::make_unique<NumberToken>(
+            NumberToken{ { TokenType::eNumber }, value });
+    }
+};
+
+export
+auto printToken(Token* token) -> void {
+    if      (token->type == TokenType::eNumber)     { std::print("number({})", static_cast<NumberToken*>(token)->value); }
+    else if (token->type == TokenType::eIdentifier) { std::print("identifier({})", static_cast<IdentifierToken*>(token)->name); }
+    else if (token->type == TokenType::eEof)        { std::print("eof"); }
+    else if (token->type == TokenType::eUnknown)    { std::print("unknown"); }
+    else if (token->type == TokenType::eColon)      { std::print("colon"); }
+    else if (token->type == TokenType::eSemicolon)  { std::print("semicolon"); }
+    else if (token->type == TokenType::eLeftRound)  { std::print("left_round"); }
+    else if (token->type == TokenType::eRightRound) { std::print("right_round"); }
+    else if (token->type == TokenType::eLeftCurly)  { std::print("left_curly"); }
+    else if (token->type == TokenType::eRightCurly) { std::print("right_curly"); }
+    else if (token->type == TokenType::eFn)         { std::print("fn"); }
+    else if (token->type == TokenType::eExtern)     { std::print("extern"); }
+    else if (token->type == TokenType::eReturn)     { std::print("return"); }
+    else                                            { std::print("UNHANDLED_TOKEN"); }
+}

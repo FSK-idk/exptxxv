@@ -9,6 +9,11 @@ export
 enum class TokenType {
     eNumber,
     eIdentifier,
+    
+    // reserved
+    eFn,
+    eExtern,
+    eReturn,
 
     // special
     eEof,
@@ -19,11 +24,6 @@ enum class TokenType {
     eRightRound,
     eLeftCurly,
     eRightCurly,
-    
-    // reserved
-    eFn,
-    eExtern,
-    eReturn,
 };
 
 export

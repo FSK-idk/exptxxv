@@ -17,6 +17,7 @@ enum class FunctionStatementType {
     eReturnStatement,
 };
 
+
 export
 class Node {
 public:
@@ -26,21 +27,25 @@ private:
 export
 class IdentifierNode : public Node {
 public:
-    IdentifierNode(std::string identifier)
-        : identifier_(std::move(identifier)) {}
-    auto identifier() const -> std::string const& { return identifier_; } 
+    IdentifierNode(std::string name)
+        : name_(std::move(name)) {}
+    auto name() const -> std::string const& {
+        return name_;
+    }
 private:
-    std::string identifier_;
+    std::string name_;
 };
 
 export
 class NumberNode : public Node {
 public:
     NumberNode(f64 number)
-        : number_(number) {}
-    auto number() -> f64 { return number_; }
+        : value_(number) {}
+    auto value() -> f64 {
+        return value_;
+    }
 private:
-    f64 number_;
+    f64 value_;
 };
 
 export
@@ -65,38 +70,38 @@ protected:
 export
 class FunctionStatementNode : public Node {
 public:
-    auto functionStatementType() const -> FunctionStatementType {
-        return functionStatementType_;
+    auto type() const -> FunctionStatementType {
+        return type_;
     }
 protected:
     FunctionStatementNode(FunctionStatementType type)
-        : functionStatementType_(type) {}
-    FunctionStatementType functionStatementType_;
+        : type_(type) {}
+    FunctionStatementType type_;
 };
 
 export
 class ReturnStatementNode : public FunctionStatementNode {
 public:
-    ReturnStatementNode(std::unique_ptr<NumberNode> numberNode)
+    ReturnStatementNode(std::unique_ptr<NumberNode> number)
         : FunctionStatementNode(FunctionStatementType::eReturnStatement)
-        , numberNode_(std::move(numberNode)) {}
+        , number_(std::move(number)) {}
     auto number() const -> std::unique_ptr<NumberNode> const& {
-        return numberNode_;
+        return number_;
     }
 private:
-    std::unique_ptr<NumberNode> numberNode_;
+    std::unique_ptr<NumberNode> number_;
 };
 
 export
 class ModuleStatementNode : public Node {
 public:
-    auto moduleStatementType() const -> ModuleStatementType {
-        return moduleStatementType_;
+    auto type() const -> ModuleStatementType {
+        return type_;
     }
 protected:
     ModuleStatementNode(ModuleStatementType type)
-        : moduleStatementType_(type) {}
-    ModuleStatementType moduleStatementType_;
+        : type_(type) {}
+    ModuleStatementType type_;
 };
 
 export
@@ -105,12 +110,12 @@ public:
     FunctionDeclarationNode(
         std::unique_ptr<FunctionPrototypeNode> prototype)
         : ModuleStatementNode(ModuleStatementType::eFunctionDeclaration)
-        , functionPrototype_(std::move(prototype)) {}
-    auto functionPrototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
-        return functionPrototype_;
+        , prototype_(std::move(prototype)) {}
+    auto prototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
+        return prototype_;
     }
 private:
-    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+    std::unique_ptr<FunctionPrototypeNode> prototype_;
 };
 
 export
@@ -120,16 +125,16 @@ public:
         std::unique_ptr<FunctionPrototypeNode> prototype,
         std::vector<std::unique_ptr<FunctionStatementNode>> body)
         : ModuleStatementNode(ModuleStatementType::eFunctionDefinition)
-        , functionPrototype_(std::move(prototype))
+        , prototype_(std::move(prototype))
         , body_(std::move(body)) {}
-    auto functionPrototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
-        return functionPrototype_;
+    auto prototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
+        return prototype_;
     }
     auto body() const -> std::vector<std::unique_ptr<FunctionStatementNode>> const& {
         return body_;
     }
 private:
-    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+    std::unique_ptr<FunctionPrototypeNode> prototype_;
     std::vector<std::unique_ptr<FunctionStatementNode>> body_;
 };
 
@@ -139,22 +144,22 @@ public:
     ExternFunctionDeclarationNode(
         std::unique_ptr<FunctionPrototypeNode> prototype)
         : ModuleStatementNode(ModuleStatementType::eExternFunctionDeclaration)
-        , functionPrototype_(std::move(prototype)) {}
-    auto functionPrototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
-        return functionPrototype_;
+        , prototype_(std::move(prototype)) {}
+    auto prototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
+        return prototype_;
     }
 private:
-    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+    std::unique_ptr<FunctionPrototypeNode> prototype_;
 };
 
 export
 class ModuleNode : public Node {
 public:
-    ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> statements)
-        : moduleStatements_(std::move(statements)) {}
-    auto moduleStatements() const -> std::vector<std::unique_ptr<ModuleStatementNode>> const& {
-        return moduleStatements_;
+    ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> body)
+        : body_(std::move(body)) {}
+    auto body() const -> std::vector<std::unique_ptr<ModuleStatementNode>> const& {
+        return body_;
     }
 private:
-    std::vector<std::unique_ptr<ModuleStatementNode>> moduleStatements_;
+    std::vector<std::unique_ptr<ModuleStatementNode>> body_;
 };

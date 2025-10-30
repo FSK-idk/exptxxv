@@ -45,88 +45,88 @@ public:
 
     auto parse(std::vector<std::unique_ptr<Token>> tokens) -> std::unique_ptr<ModuleNode> {
         tokens_ = std::move(tokens);
-        currentToken_ = 0;
+        tokenIndex_ = 0;
         auto moduleNode = parseModule();
         tokens_.clear();
         return moduleNode;
     }
 
 private:
-    auto getCurrentToken() -> Token* {
-        return tokens_[currentToken_].get();
+    auto token() -> Token* {
+        return tokens_[tokenIndex_].get();
     }
 
     auto advanceToken() -> void {
-        ++currentToken_;
+        ++tokenIndex_;
     }
 
     // identifier
     //   ::= identifier-token
     auto parseIdentifier() -> std::unique_ptr<IdentifierNode> {
-        if (getCurrentToken()->type != TokenType::eIdentifier) {
+        if (token()->type != TokenType::eIdentifier) {
             std::println("expected identifier");
             return nullptr;
         }
-        auto identifierToken = static_cast<IdentifierToken*>(getCurrentToken());
+        auto identifier = static_cast<IdentifierToken*>(token());
         advanceToken();
-        return std::make_unique<IdentifierNode>(std::move(identifierToken->name));
+        return std::make_unique<IdentifierNode>(std::move(identifier->name));
     }
 
     // number
     //   ::= number-token
     auto parseNumber() -> std::unique_ptr<NumberNode> {
-        if (getCurrentToken()->type != TokenType::eNumber) {
+        if (token()->type != TokenType::eNumber) {
             std::println("expected number");
             return nullptr;
         }
-        auto numberToken = static_cast<NumberToken*>(getCurrentToken());
+        auto number = static_cast<NumberToken*>(token());
         advanceToken();
-        return std::make_unique<NumberNode>(numberToken->value);
+        return std::make_unique<NumberNode>(number->value);
     }
 
     // function-prototype
     //   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
     auto parseFunctionPrototype() -> std::unique_ptr<FunctionPrototypeNode> {
-        auto identifierNode = parseIdentifier();
-        if (!identifierNode) return nullptr;
-        if (getCurrentToken()->type != TokenType::eColon) {
+        auto identifier = parseIdentifier();
+        if (!identifier) return nullptr;
+        if (token()->type != TokenType::eColon) {
             std::println("expected colon");
             return nullptr;
         }
         advanceToken();
-        if (getCurrentToken()->type != TokenType::eLeftRound) {
+        if (token()->type != TokenType::eLeftRound) {
             std::println("expected left round");
             return nullptr;
         }
         advanceToken();
-        std::vector<std::unique_ptr<IdentifierNode>> args;
-        if (getCurrentToken()->type == TokenType::eRightRound) {
+        std::vector<std::unique_ptr<IdentifierNode>> parameters;
+        if (token()->type == TokenType::eRightRound) {
             advanceToken();
         }
         else {
-            auto identifierNode = parseIdentifier();
-            if (!identifierNode) return nullptr;
-            args.emplace_back(std::move(identifierNode));
+            auto identifier = parseIdentifier();
+            if (!identifier) return nullptr;
+            parameters.emplace_back(std::move(identifier));
             while (true) {
-                if (getCurrentToken()->type == TokenType::eRightRound) {
+                if (token()->type == TokenType::eRightRound) {
                     advanceToken();
                     break;
                 }
-                if (getCurrentToken()->type != TokenType::eComma) {
+                if (token()->type != TokenType::eComma) {
                     std::println("expected comma");
                     return nullptr;
                 }
                 advanceToken();
-                if (getCurrentToken()->type == TokenType::eRightRound) {
+                if (token()->type == TokenType::eRightRound) {
                     advanceToken();
                     break;
                 }
-                auto identifierNode = parseIdentifier();
-                if (!identifierNode) return nullptr;
-                args.emplace_back(std::move(identifierNode));
+                auto identifier = parseIdentifier();
+                if (!identifier) return nullptr;
+                parameters.emplace_back(std::move(identifier));
             }
         }
-        return std::make_unique<FunctionPrototypeNode>(std::move(identifierNode), std::move(args));
+        return std::make_unique<FunctionPrototypeNode>(std::move(identifier), std::move(parameters));
     }
 
     // function-statement
@@ -140,19 +140,19 @@ private:
     // return-statement
     //   ::= 'return' number ';'
     auto parseReturnStatement() -> std::unique_ptr<ReturnStatementNode> {
-        if (getCurrentToken()->type != TokenType::eReturn) {
+        if (token()->type != TokenType::eReturn) {
             std::println("expected 'return'");
             return nullptr;
         }
         advanceToken();
-        auto numberNode = parseNumber();
-        if (!numberNode) return nullptr;
-        if (getCurrentToken()->type != TokenType::eSemicolon) {
+        auto number = parseNumber();
+        if (!number) return nullptr;
+        if (token()->type != TokenType::eSemicolon) {
             std::println("expected semicolon");
             return nullptr;
         }
         advanceToken();
-        return std::make_unique<ReturnStatementNode>(std::move(numberNode));
+        return std::make_unique<ReturnStatementNode>(std::move(number));
     }
 
     // module-statement
@@ -167,12 +167,12 @@ private:
         // extern-function-declaration
         //   ::= 'extern' function-prototype ';'
         b8 isExtern = false;
-        if (getCurrentToken()->type == TokenType::eExtern) {
+        if (token()->type == TokenType::eExtern) {
             isExtern = true;
             advanceToken();
         }
         auto prototype = parseFunctionPrototype();
-        if (getCurrentToken()->type == TokenType::eSemicolon) {
+        if (token()->type == TokenType::eSemicolon) {
             advanceToken();
             if (isExtern) {
                 return std::make_unique<ExternFunctionDeclarationNode>(std::move(prototype));
@@ -181,14 +181,14 @@ private:
                 return std::make_unique<FunctionDeclarationNode>(std::move(prototype));
             }
         }
-        if (getCurrentToken()->type != TokenType::eLeftCurly) {
+        if (token()->type != TokenType::eLeftCurly) {
             std::println("expected curly");
             return nullptr;
         }
         advanceToken();
         std::vector<std::unique_ptr<FunctionStatementNode>> body;
         while (true) {
-            if (getCurrentToken()->type == TokenType::eRightCurly) {
+            if (token()->type == TokenType::eRightCurly) {
                 advanceToken();
                 break;
             }
@@ -196,7 +196,7 @@ private:
             if (!statement) return nullptr;
             body.emplace_back(std::move(statement));
         }
-        if (getCurrentToken()->type != TokenType::eSemicolon) {
+        if (token()->type != TokenType::eSemicolon) {
             std::println("expected semicolon");
             return nullptr;
         }
@@ -207,20 +207,20 @@ private:
     // module
     //   ::= module-statement*
     auto parseModule() -> std::unique_ptr<ModuleNode> {
-        std::vector<std::unique_ptr<ModuleStatementNode>> statements;
+        std::vector<std::unique_ptr<ModuleStatementNode>> body;
         while (true) {
-            if (getCurrentToken()->type == TokenType::eEof) {
+            if (token()->type == TokenType::eEof) {
                 advanceToken();
                 break;
             }
             auto statement = parseModuleStatement();
             if (!statement) return nullptr;
-            statements.emplace_back(std::move(statement));
+            body.emplace_back(std::move(statement));
         }
-        return std::make_unique<ModuleNode>(std::move(statements));
+        return std::make_unique<ModuleNode>(std::move(body));
     }
 
 private:
     std::vector<std::unique_ptr<Token>> tokens_;
-    u64 currentToken_;
+    u64 tokenIndex_;
 };

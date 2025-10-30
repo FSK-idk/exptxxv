@@ -16,7 +16,7 @@ public:
     auto exec(std::string program) -> void {
         Lexer lexer;
 
-        std::vector<std::unique_ptr<Token>> tokens = lexer.tokenize(program);
+        auto tokens = lexer.tokenize(program);
 
         for (auto& token : tokens) {
             printToken(token.get());
@@ -26,7 +26,7 @@ public:
 
         Parser parser;
 
-        std::unique_ptr<ModuleNode> moduleNode = parser.parse(std::move(tokens));
+        auto moduleNode = parser.parse(std::move(tokens));
 
         Codegen codeGenerator;
 

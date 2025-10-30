@@ -3,7 +3,9 @@ export module compiler;
 import std;
 import tokens;
 import lexer;
+import nodes;
 import parser;
+import codegen;
 
 
 export
@@ -24,6 +26,10 @@ public:
 
         Parser parser;
 
-        auto moduleNode = parser.parse(std::move(tokens));
+        std::unique_ptr<ModuleNode> moduleNode = parser.parse(std::move(tokens));
+
+        Codegen codeGenerator;
+
+        codeGenerator.codegen(moduleNode.get());
     }
 };

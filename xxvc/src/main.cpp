@@ -16,10 +16,11 @@ import compiler;
 
 auto main() -> i32 {
     std::string program = R"(
-        extern print: (x);
+        extern
+        print: (x);
 
-        main: () {
-            return 0;
+        main: (x, y) {
+            return 21;
         };
     )";
 

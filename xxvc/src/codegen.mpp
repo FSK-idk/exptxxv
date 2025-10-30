@@ -1,0 +1,153 @@
+module;
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Value.h>
+#include <llvm/IR/GlobalValue.h>
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/APInt.h>
+
+export module codegen;
+
+import std;
+
+import types;
+import nodes;
+
+
+export
+class Codegen {
+public:
+    Codegen() {}
+
+    auto codegen(ModuleNode* moduleNode) -> void {
+        context_ = std::make_unique<llvm::LLVMContext>();
+        module_ = std::make_unique<llvm::Module>("main", *context_);
+        builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);
+
+        codegenModule(moduleNode);
+
+        module_->print(llvm::outs(), nullptr);
+
+        builder_.reset();
+        module_.reset();
+        context_.reset();
+    }
+
+private:
+
+    auto codegenNumber(NumberNode* node) -> llvm::ConstantFP* {
+        return llvm::ConstantFP::get(*context_, llvm::APFloat(node->number()));
+    }
+
+    auto codegenFunctionPrototype(FunctionPrototypeNode* node) -> llvm::Function* {
+        // TODO: remove after types are introduced
+        if (node->identifier()->identifier() == "main") {
+        std::vector<llvm::Type*> args(node->args().size(), llvm::Type::getDoubleTy(*context_));
+            llvm::FunctionType* functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*context_), args, false);
+            llvm::Function* prototype = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, node->identifier()->identifier(), *module_);
+            u32 i = 0; for (auto& arg : prototype->args()) arg.setName(node->args()[i++]->identifier());
+            return prototype;
+        }
+        std::vector<llvm::Type*> args(node->args().size(), llvm::Type::getDoubleTy(*context_));
+        llvm::FunctionType* functionType = llvm::FunctionType::get(llvm::Type::getDoubleTy(*context_), args, false);
+        llvm::Function* prototype = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, node->identifier()->identifier(), *module_);
+        u32 i = 0; for (auto& arg : prototype->args()) arg.setName(node->args()[i++]->identifier());
+        return prototype;
+    }
+
+    auto codegenFunctionStatement(FunctionStatementNode* node) -> llvm::Value* {
+        if (node->functionStatementType() == FunctionStatementType::eReturnStatement) {
+            return codegenReturnStatement(static_cast<ReturnStatementNode*>(node));
+        }
+        return nullptr;
+    }
+
+    auto codegenReturnStatement(ReturnStatementNode* node) -> llvm::Value* {
+        // TODO: remove after types are introduced
+        if (isMainFunction_) {
+            auto number = llvm::ConstantInt::get(*context_, llvm::APInt(32, static_cast<u64>(node->number()->number()), true));
+            return builder_->CreateRet(number);
+        }
+
+        auto number = codegenNumber(node->number().get());
+        return builder_->CreateRet(number);
+    }
+
+    auto codegenModuleStatement(ModuleStatementNode* node) -> void {
+        if      (node->moduleStatementType() == ModuleStatementType::eFunctionDeclaration) {
+            codegenFunctionDeclaration(static_cast<FunctionDeclarationNode*>(node));
+        }
+        else if (node->moduleStatementType() == ModuleStatementType::eFunctionDefinition) {
+            codegenFunctionDefinition(static_cast<FunctionDefinitionNode*>(node));
+        }
+        else if (node->moduleStatementType() == ModuleStatementType::eExternFunctionDeclaration) {
+            codegenExternFunctionDeclaration(static_cast<ExternFunctionDeclarationNode*>(node));
+        }
+    }
+
+    auto codegenFunctionDeclaration(FunctionDeclarationNode* node) -> void {
+        // TODO: handle repeats
+        auto prototype = codegenFunctionPrototype(node->functionPrototype().get());
+        prototypes_[node->functionPrototype()->identifier()->identifier()] = prototype;
+    }
+
+    auto codegenFunctionDefinition(FunctionDefinitionNode* node) -> void {
+        // TODO: handle repeats
+        llvm::Function* prototype;
+        if (prototypes_.contains(node->functionPrototype()->identifier()->identifier())) {
+            // TODO: check number of args in prototype
+            prototype = prototypes_[node->functionPrototype()->identifier()->identifier()];
+        }
+        else {
+            prototype = codegenFunctionPrototype(node->functionPrototype().get());
+            prototypes_[node->functionPrototype()->identifier()->identifier()] = prototype;
+        }
+
+        isMainFunction_ = node->functionPrototype()->identifier()->identifier() == "main";
+
+        llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*context_, "entry", prototype);
+        builder_->SetInsertPoint(entryBlock);
+        for (auto& arg : prototype->args()) {
+            llvm::IRBuilder<> builder(&prototype->getEntryBlock(), prototype->getEntryBlock().end());
+            llvm::AllocaInst* argAlloca = builder.CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, arg.getName());
+            builder_->CreateStore(&arg, argAlloca);
+        }
+        for (auto& statement : node->body()) {
+            codegenFunctionStatement(statement.get());
+        }
+    }
+
+    auto codegenExternFunctionDeclaration(ExternFunctionDeclarationNode* node) -> void {
+        // TODO: handle repeats
+        llvm::Function* prototype;
+        if (prototypes_.contains(node->functionPrototype()->identifier()->identifier())) {
+            // TODO: check number of args in prototype
+            prototype = prototypes_[node->functionPrototype()->identifier()->identifier()];
+        }
+        else {
+            prototype = codegenFunctionPrototype(node->functionPrototype().get());
+            prototypes_[node->functionPrototype()->identifier()->identifier()] = prototype;
+        }
+    }
+
+    auto codegenModule(ModuleNode* node) -> void {
+        for (auto& statement : node->moduleStatements()) {
+            codegenModuleStatement(statement.get());
+        }
+    }
+
+
+private:
+    std::unique_ptr<llvm::LLVMContext> context_;
+    std::unique_ptr<llvm::Module> module_;
+    std::unique_ptr<llvm::IRBuilder<>> builder_;
+
+    std::map<std::string, llvm::Function*> prototypes_;
+    bool isMainFunction_;
+};

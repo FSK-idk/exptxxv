@@ -106,6 +106,7 @@ private:
         else {
             auto identifierNode = parseIdentifier();
             if (!identifierNode) return nullptr;
+            args.emplace_back(std::move(identifierNode));
             while (true) {
                 if (getCurrentToken()->type == TokenType::eRightRound) {
                     advanceToken();

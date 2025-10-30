@@ -11,7 +11,6 @@ enum class TokenType {
     eIdentifier,
     
     // reserved
-    eFn,
     eExtern,
     eReturn,
 
@@ -20,6 +19,7 @@ enum class TokenType {
     eUnknown,
     eColon,
     eSemicolon,
+    eComma,
     eLeftRound,
     eRightRound,
     eLeftCurly,
@@ -60,11 +60,11 @@ auto printToken(Token* token) -> void {
     else if (token->type == TokenType::eUnknown)    { std::print("unknown"); }
     else if (token->type == TokenType::eColon)      { std::print("colon"); }
     else if (token->type == TokenType::eSemicolon)  { std::print("semicolon"); }
+    else if (token->type == TokenType::eComma)      { std::print("comma"); }
     else if (token->type == TokenType::eLeftRound)  { std::print("left_round"); }
     else if (token->type == TokenType::eRightRound) { std::print("right_round"); }
     else if (token->type == TokenType::eLeftCurly)  { std::print("left_curly"); }
     else if (token->type == TokenType::eRightCurly) { std::print("right_curly"); }
-    else if (token->type == TokenType::eFn)         { std::print("fn"); }
     else if (token->type == TokenType::eExtern)     { std::print("extern"); }
     else if (token->type == TokenType::eReturn)     { std::print("return"); }
     else                                            { std::print("UNHANDLED_TOKEN"); }

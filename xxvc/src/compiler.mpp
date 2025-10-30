@@ -3,6 +3,7 @@ export module compiler;
 import std;
 import tokens;
 import lexer;
+import parser;
 
 
 export
@@ -20,5 +21,9 @@ public:
             std::print(" ");
         }
         std::println();
+
+        Parser parser;
+
+        auto moduleNode = parser.parse(std::move(tokens));
     }
 };

@@ -1,0 +1,378 @@
+export module parser;
+
+import std;
+
+import types;
+import tokens;
+
+
+// xxv grammar
+//
+// identifier
+//   ::= identifier-token
+// number
+//   ::= number-token
+//
+// function-prototype
+//   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
+//
+// function-statement
+//   ::= return-statement
+// return-statement
+//   ::= 'return' number ';'
+//
+// module-statement
+//   ::= function-declaration
+//   ::= function-definition
+//   ::= extern-function-declaration
+// function-declaration
+//   ::= function-prototype ';'
+// function-definition
+//   ::= function-prototype '{' function-statement* '}' ';'
+// extern-function-declaration
+//   ::= 'extern' function-prototype ';'
+//
+// module
+//   ::= module-statement*
+//
+
+
+enum class ModuleStatementType {
+    eFunctionDeclaration,
+    eFunctionDefinition,
+    eExternFunctionDeclaration,
+};
+
+enum class FunctionStatementType {
+    eReturnStatement,
+};
+
+
+
+
+class Node {
+public:
+private:
+};
+
+
+
+
+class IdentifierNode : public Node {
+public:
+    IdentifierNode(std::string identifier)
+        : identifier_(std::move(identifier)) {}
+    auto identifier() const -> std::string const& { return identifier_; } 
+private:
+    std::string identifier_;
+};
+
+class NumberNode : public Node {
+public:
+    NumberNode(f64 number)
+        : number_(number) {}
+    auto number() -> f64 { return number_; }
+private:
+    f64 number_;
+};
+
+
+
+
+class FunctionPrototypeNode : public Node {
+public:
+    FunctionPrototypeNode(
+        std::unique_ptr<IdentifierNode> identifier,
+        std::vector<std::unique_ptr<IdentifierNode>> args)
+        : identifier_(std::move(identifier))
+        , args_(std::move(args)) {}
+protected:
+    std::unique_ptr<IdentifierNode> identifier_;
+    std::vector<std::unique_ptr<IdentifierNode>> args_;
+};
+
+
+
+
+class FunctionStatementNode : public Node {
+public:
+    auto functionStatementType() -> FunctionStatementType { return functionStatementType_; }
+protected:
+    FunctionStatementNode(FunctionStatementType type)
+        : functionStatementType_(type) {}
+    FunctionStatementType functionStatementType_;
+};
+
+class ReturnStatementNode : public FunctionStatementNode {
+public:
+    ReturnStatementNode(std::unique_ptr<NumberNode> numberNode)
+        : FunctionStatementNode(FunctionStatementType::eReturnStatement)
+        , numberNode_(std::move(numberNode)) {}
+private:
+    std::unique_ptr<NumberNode> numberNode_;
+};
+
+
+
+
+class ModuleStatementNode : public Node {
+public:
+    auto moduleStatementType() -> ModuleStatementType { return moduleStatementType_; }
+protected:
+    ModuleStatementNode(ModuleStatementType type)
+        : moduleStatementType_(type) {}
+    ModuleStatementType moduleStatementType_;
+};
+
+class FunctionDeclarationNode : public ModuleStatementNode {
+public:
+    FunctionDeclarationNode(
+        std::unique_ptr<FunctionPrototypeNode> prototype)
+        : ModuleStatementNode(ModuleStatementType::eFunctionDeclaration)
+        , functionPrototype_(std::move(prototype)) {}
+private:
+    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+};
+
+class FunctionDefinitionNode : public ModuleStatementNode {
+public:
+    FunctionDefinitionNode(
+        std::unique_ptr<FunctionPrototypeNode> prototype,
+        std::vector<std::unique_ptr<FunctionStatementNode>> body)
+        : ModuleStatementNode(ModuleStatementType::eFunctionDefinition)
+        , functionPrototype_(std::move(prototype))
+        , body_(std::move(body)) {}
+private:
+    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+    std::vector<std::unique_ptr<FunctionStatementNode>> body_;
+};
+
+class ExternFunctionDeclarationNode : public ModuleStatementNode {
+public:
+    ExternFunctionDeclarationNode(
+        std::unique_ptr<FunctionPrototypeNode> prototype)
+        : ModuleStatementNode(ModuleStatementType::eExternFunctionDeclaration)
+        , functionPrototype_(std::move(prototype)) {}
+private:
+    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+};
+
+
+
+
+class ModuleNode : public Node {
+public:
+    ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> statements)
+        : moduleStatements_(std::move(statements)) {}
+private:
+    std::vector<std::unique_ptr<ModuleStatementNode>> moduleStatements_;
+};
+
+
+
+
+
+
+
+export
+class Parser {
+public:
+    Parser() {}
+
+    auto parse(std::vector<std::unique_ptr<Token>> tokens) {
+        tokens_ = std::move(tokens);
+        currentToken_ = 0;
+        auto moduleNode = parseModule();
+        tokens_.clear();
+        return moduleNode;
+    }
+
+private:
+    std::vector<std::unique_ptr<Token>> tokens_;
+    u64 currentToken_;
+
+    auto getCurrentToken() -> Token* {
+        return tokens_[currentToken_].get();
+    }
+
+    auto advanceToken() -> void {
+        ++currentToken_;
+    }
+
+
+
+
+    // identifier
+    //   ::= identifier-token
+    auto parseIdentifier() -> std::unique_ptr<IdentifierNode> {
+        if (getCurrentToken()->type != TokenType::eIdentifier) {
+            std::println("expected identifier");
+            return nullptr;
+        }
+        auto identifierToken = static_cast<IdentifierToken*>(getCurrentToken());
+        advanceToken();
+        return std::make_unique<IdentifierNode>(std::move(identifierToken->name));
+    }
+
+    // number
+    //   ::= number-token
+    auto parseNumber() -> std::unique_ptr<NumberNode> {
+        if (getCurrentToken()->type != TokenType::eNumber) {
+            std::println("expected number");
+            return nullptr;
+        }
+        auto numberToken = static_cast<NumberToken*>(getCurrentToken());
+        advanceToken();
+        return std::make_unique<NumberNode>(numberToken->value);
+    }
+
+
+
+
+    // function-prototype
+    //   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
+    auto parseFunctionPrototype() -> std::unique_ptr<FunctionPrototypeNode> {
+        auto identifierNode = parseIdentifier();
+        if (!identifierNode) return nullptr;
+        if (getCurrentToken()->type != TokenType::eColon) {
+            std::println("expected colon");
+            return nullptr;
+        }
+        advanceToken();
+        if (getCurrentToken()->type != TokenType::eLeftRound) {
+            std::println("expected left round");
+            return nullptr;
+        }
+        advanceToken();
+        std::vector<std::unique_ptr<IdentifierNode>> args;
+        if (getCurrentToken()->type == TokenType::eRightRound) {
+            advanceToken();
+        }
+        else {
+            auto identifierNode = parseIdentifier();
+            if (!identifierNode) return nullptr;
+            while (true) {
+                if (getCurrentToken()->type == TokenType::eRightRound) {
+                    advanceToken();
+                    break;
+                }
+                if (getCurrentToken()->type != TokenType::eComma) {
+                    std::println("expected comma");
+                    return nullptr;
+                }
+                advanceToken();
+                if (getCurrentToken()->type == TokenType::eRightRound) {
+                    advanceToken();
+                    break;
+                }
+                auto identifierNode = parseIdentifier();
+                if (!identifierNode) return nullptr;
+                args.emplace_back(std::move(identifierNode));
+            }
+        }
+        return std::make_unique<FunctionPrototypeNode>(
+                std::move(identifierNode), std::move(args));
+    }
+
+
+
+
+    // function-statement
+    //   ::= return-statement
+    auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
+        auto returnStatement = parseReturnStatement();
+        if (!returnStatement) return nullptr;
+        return returnStatement;
+    };
+
+    // return-statement
+    //   ::= 'return' number ';'
+    auto parseReturnStatement() -> std::unique_ptr<ReturnStatementNode> {
+        if (getCurrentToken()->type != TokenType::eReturn) {
+            std::println("expected 'return'");
+            return nullptr;
+        }
+        advanceToken();
+        auto numberNode = parseNumber();
+        if (!numberNode) return nullptr;
+        if (getCurrentToken()->type != TokenType::eSemicolon) {
+            std::println("expected semicolon");
+            return nullptr;
+        }
+        advanceToken();
+        return std::make_unique<ReturnStatementNode>(std::move(numberNode));
+    }
+
+
+
+
+    // module-statement
+    //   ::= function-declaration
+    //   ::= function-definition
+    //   ::= extern-function-declaration
+    auto parseModuleStatement() -> std::unique_ptr<ModuleStatementNode> {
+        // function-declaration
+        //   ::= function-prototype ';'
+        // function-definition
+        //   ::= function-prototype '{' function-statement* '}' ';'
+        // extern-function-declaration
+        //   ::= 'extern' function-prototype ';'
+        b8 isExtern = false;
+        if (getCurrentToken()->type == TokenType::eExtern) {
+            isExtern = true;
+            advanceToken();
+        }
+        auto prototype = parseFunctionPrototype();
+        if (getCurrentToken()->type == TokenType::eSemicolon) {
+            advanceToken();
+            if (isExtern) {
+                return std::make_unique<ExternFunctionDeclarationNode>(
+                    std::move(prototype));
+            }
+            else {
+                return std::make_unique<FunctionDeclarationNode>(
+                    std::move(prototype));
+            }
+        }
+        if (getCurrentToken()->type != TokenType::eLeftCurly) {
+            std::println("expected curly");
+            return nullptr;
+        }
+        advanceToken();
+        std::vector<std::unique_ptr<FunctionStatementNode>> body;
+        while (true) {
+            if (getCurrentToken()->type == TokenType::eRightCurly) {
+                advanceToken();
+                break;
+            }
+            auto statement = parseFunctionStatement();
+            if (!statement) return nullptr;
+            body.emplace_back(std::move(statement));
+        }
+        if (getCurrentToken()->type != TokenType::eSemicolon) {
+            std::println("expected semicolon");
+            return nullptr;
+        }
+        advanceToken();
+        return std::make_unique<FunctionDefinitionNode>(std::move(prototype), std::move(body));
+    }
+
+
+
+
+    // module
+    //   ::= module-statement*
+    auto parseModule() -> std::unique_ptr<ModuleNode> {
+        std::vector<std::unique_ptr<ModuleStatementNode>> statements;
+        while (true) {
+            if (getCurrentToken()->type == TokenType::eEof) {
+                advanceToken();
+                break;
+            }
+            auto statement = parseModuleStatement();
+            if (!statement) return nullptr;
+            statements.emplace_back(std::move(statement));
+        }
+        return std::make_unique<ModuleNode>(std::move(statements));
+    }
+};

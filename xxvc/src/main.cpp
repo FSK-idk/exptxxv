@@ -4,39 +4,21 @@ import types;
 import compiler;
 
 
-// xxv grammar
-//
-// module
-//     ::= ( ( declaration | definition ) ';' )*
-// declaration
-//     ::= function_declaration
-//     ::= extern_function_declaration
-// function_declaration
-//     ::= 'fn' identifier ':' '(' ( identifier ( ',' identifier )* )? ')'
-// extern_function_declaration
-//     ::= 'extern' function_declaration
-// definition
-//     ::= function_definition
-// function_definition
-//     ::= function_declaration '{' ( statement ';' )* '}'
-// statement
-//     ::= return_statement
-// return_statement
-//     ::= 'return' number
-//
 // example
 //
 // extern
-// fn print: (x);
+// print: (x);
 //
-// fn main: () {
+// main: () {
 //     return 0;
 // };
 
 
 auto main() -> i32 {
     std::string program = R"(
-        fn main: () {
+        extern print: (x);
+
+        main: () {
             return 0;
         };
     )";

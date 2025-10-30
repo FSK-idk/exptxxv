@@ -4,6 +4,7 @@ import std;
 
 import types;
 import tokens;
+import nodes;
 
 
 // xxv grammar
@@ -37,149 +38,12 @@ import tokens;
 //
 
 
-enum class ModuleStatementType {
-    eFunctionDeclaration,
-    eFunctionDefinition,
-    eExternFunctionDeclaration,
-};
-
-enum class FunctionStatementType {
-    eReturnStatement,
-};
-
-
-
-
-class Node {
-public:
-private:
-};
-
-
-
-
-class IdentifierNode : public Node {
-public:
-    IdentifierNode(std::string identifier)
-        : identifier_(std::move(identifier)) {}
-    auto identifier() const -> std::string const& { return identifier_; } 
-private:
-    std::string identifier_;
-};
-
-class NumberNode : public Node {
-public:
-    NumberNode(f64 number)
-        : number_(number) {}
-    auto number() -> f64 { return number_; }
-private:
-    f64 number_;
-};
-
-
-
-
-class FunctionPrototypeNode : public Node {
-public:
-    FunctionPrototypeNode(
-        std::unique_ptr<IdentifierNode> identifier,
-        std::vector<std::unique_ptr<IdentifierNode>> args)
-        : identifier_(std::move(identifier))
-        , args_(std::move(args)) {}
-protected:
-    std::unique_ptr<IdentifierNode> identifier_;
-    std::vector<std::unique_ptr<IdentifierNode>> args_;
-};
-
-
-
-
-class FunctionStatementNode : public Node {
-public:
-    auto functionStatementType() -> FunctionStatementType { return functionStatementType_; }
-protected:
-    FunctionStatementNode(FunctionStatementType type)
-        : functionStatementType_(type) {}
-    FunctionStatementType functionStatementType_;
-};
-
-class ReturnStatementNode : public FunctionStatementNode {
-public:
-    ReturnStatementNode(std::unique_ptr<NumberNode> numberNode)
-        : FunctionStatementNode(FunctionStatementType::eReturnStatement)
-        , numberNode_(std::move(numberNode)) {}
-private:
-    std::unique_ptr<NumberNode> numberNode_;
-};
-
-
-
-
-class ModuleStatementNode : public Node {
-public:
-    auto moduleStatementType() -> ModuleStatementType { return moduleStatementType_; }
-protected:
-    ModuleStatementNode(ModuleStatementType type)
-        : moduleStatementType_(type) {}
-    ModuleStatementType moduleStatementType_;
-};
-
-class FunctionDeclarationNode : public ModuleStatementNode {
-public:
-    FunctionDeclarationNode(
-        std::unique_ptr<FunctionPrototypeNode> prototype)
-        : ModuleStatementNode(ModuleStatementType::eFunctionDeclaration)
-        , functionPrototype_(std::move(prototype)) {}
-private:
-    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
-};
-
-class FunctionDefinitionNode : public ModuleStatementNode {
-public:
-    FunctionDefinitionNode(
-        std::unique_ptr<FunctionPrototypeNode> prototype,
-        std::vector<std::unique_ptr<FunctionStatementNode>> body)
-        : ModuleStatementNode(ModuleStatementType::eFunctionDefinition)
-        , functionPrototype_(std::move(prototype))
-        , body_(std::move(body)) {}
-private:
-    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
-    std::vector<std::unique_ptr<FunctionStatementNode>> body_;
-};
-
-class ExternFunctionDeclarationNode : public ModuleStatementNode {
-public:
-    ExternFunctionDeclarationNode(
-        std::unique_ptr<FunctionPrototypeNode> prototype)
-        : ModuleStatementNode(ModuleStatementType::eExternFunctionDeclaration)
-        , functionPrototype_(std::move(prototype)) {}
-private:
-    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
-};
-
-
-
-
-class ModuleNode : public Node {
-public:
-    ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> statements)
-        : moduleStatements_(std::move(statements)) {}
-private:
-    std::vector<std::unique_ptr<ModuleStatementNode>> moduleStatements_;
-};
-
-
-
-
-
-
-
 export
 class Parser {
 public:
     Parser() {}
 
-    auto parse(std::vector<std::unique_ptr<Token>> tokens) {
+    auto parse(std::vector<std::unique_ptr<Token>> tokens) -> std::unique_ptr<ModuleNode> {
         tokens_ = std::move(tokens);
         currentToken_ = 0;
         auto moduleNode = parseModule();
@@ -188,9 +52,6 @@ public:
     }
 
 private:
-    std::vector<std::unique_ptr<Token>> tokens_;
-    u64 currentToken_;
-
     auto getCurrentToken() -> Token* {
         return tokens_[currentToken_].get();
     }
@@ -198,9 +59,6 @@ private:
     auto advanceToken() -> void {
         ++currentToken_;
     }
-
-
-
 
     // identifier
     //   ::= identifier-token
@@ -225,9 +83,6 @@ private:
         advanceToken();
         return std::make_unique<NumberNode>(numberToken->value);
     }
-
-
-
 
     // function-prototype
     //   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
@@ -270,12 +125,8 @@ private:
                 args.emplace_back(std::move(identifierNode));
             }
         }
-        return std::make_unique<FunctionPrototypeNode>(
-                std::move(identifierNode), std::move(args));
+        return std::make_unique<FunctionPrototypeNode>(std::move(identifierNode), std::move(args));
     }
-
-
-
 
     // function-statement
     //   ::= return-statement
@@ -303,9 +154,6 @@ private:
         return std::make_unique<ReturnStatementNode>(std::move(numberNode));
     }
 
-
-
-
     // module-statement
     //   ::= function-declaration
     //   ::= function-definition
@@ -326,12 +174,10 @@ private:
         if (getCurrentToken()->type == TokenType::eSemicolon) {
             advanceToken();
             if (isExtern) {
-                return std::make_unique<ExternFunctionDeclarationNode>(
-                    std::move(prototype));
+                return std::make_unique<ExternFunctionDeclarationNode>(std::move(prototype));
             }
             else {
-                return std::make_unique<FunctionDeclarationNode>(
-                    std::move(prototype));
+                return std::make_unique<FunctionDeclarationNode>(std::move(prototype));
             }
         }
         if (getCurrentToken()->type != TokenType::eLeftCurly) {
@@ -357,9 +203,6 @@ private:
         return std::make_unique<FunctionDefinitionNode>(std::move(prototype), std::move(body));
     }
 
-
-
-
     // module
     //   ::= module-statement*
     auto parseModule() -> std::unique_ptr<ModuleNode> {
@@ -375,4 +218,8 @@ private:
         }
         return std::make_unique<ModuleNode>(std::move(statements));
     }
+
+private:
+    std::vector<std::unique_ptr<Token>> tokens_;
+    u64 currentToken_;
 };

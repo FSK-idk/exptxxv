@@ -1,0 +1,132 @@
+export module nodes;
+
+import std;
+
+import types;
+
+
+export
+enum class ModuleStatementType {
+    eFunctionDeclaration,
+    eFunctionDefinition,
+    eExternFunctionDeclaration,
+};
+
+export
+enum class FunctionStatementType {
+    eReturnStatement,
+};
+
+export
+class Node {
+public:
+private:
+};
+
+export
+class IdentifierNode : public Node {
+public:
+    IdentifierNode(std::string identifier)
+        : identifier_(std::move(identifier)) {}
+    auto identifier() const -> std::string const& { return identifier_; } 
+private:
+    std::string identifier_;
+};
+
+export
+class NumberNode : public Node {
+public:
+    NumberNode(f64 number)
+        : number_(number) {}
+    auto number() -> f64 { return number_; }
+private:
+    f64 number_;
+};
+
+export
+class FunctionPrototypeNode : public Node {
+public:
+    FunctionPrototypeNode(
+        std::unique_ptr<IdentifierNode> identifier,
+        std::vector<std::unique_ptr<IdentifierNode>> args)
+        : identifier_(std::move(identifier))
+        , args_(std::move(args)) {}
+protected:
+    std::unique_ptr<IdentifierNode> identifier_;
+    std::vector<std::unique_ptr<IdentifierNode>> args_;
+};
+
+export
+class FunctionStatementNode : public Node {
+public:
+    auto functionStatementType() -> FunctionStatementType { return functionStatementType_; }
+protected:
+    FunctionStatementNode(FunctionStatementType type)
+        : functionStatementType_(type) {}
+    FunctionStatementType functionStatementType_;
+};
+
+export
+class ReturnStatementNode : public FunctionStatementNode {
+public:
+    ReturnStatementNode(std::unique_ptr<NumberNode> numberNode)
+        : FunctionStatementNode(FunctionStatementType::eReturnStatement)
+        , numberNode_(std::move(numberNode)) {}
+private:
+    std::unique_ptr<NumberNode> numberNode_;
+};
+
+export
+class ModuleStatementNode : public Node {
+public:
+    auto moduleStatementType() -> ModuleStatementType { return moduleStatementType_; }
+protected:
+    ModuleStatementNode(ModuleStatementType type)
+        : moduleStatementType_(type) {}
+    ModuleStatementType moduleStatementType_;
+};
+
+export
+class FunctionDeclarationNode : public ModuleStatementNode {
+public:
+    FunctionDeclarationNode(
+        std::unique_ptr<FunctionPrototypeNode> prototype)
+        : ModuleStatementNode(ModuleStatementType::eFunctionDeclaration)
+        , functionPrototype_(std::move(prototype)) {}
+private:
+    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+};
+
+export
+class FunctionDefinitionNode : public ModuleStatementNode {
+public:
+    FunctionDefinitionNode(
+        std::unique_ptr<FunctionPrototypeNode> prototype,
+        std::vector<std::unique_ptr<FunctionStatementNode>> body)
+        : ModuleStatementNode(ModuleStatementType::eFunctionDefinition)
+        , functionPrototype_(std::move(prototype))
+        , body_(std::move(body)) {}
+private:
+    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+    std::vector<std::unique_ptr<FunctionStatementNode>> body_;
+};
+
+export
+class ExternFunctionDeclarationNode : public ModuleStatementNode {
+public:
+    ExternFunctionDeclarationNode(
+        std::unique_ptr<FunctionPrototypeNode> prototype)
+        : ModuleStatementNode(ModuleStatementType::eExternFunctionDeclaration)
+        , functionPrototype_(std::move(prototype)) {}
+private:
+    std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
+};
+
+export
+class ModuleNode : public Node {
+public:
+    ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> statements)
+        : moduleStatements_(std::move(statements)) {}
+private:
+    std::vector<std::unique_ptr<ModuleStatementNode>> moduleStatements_;
+};

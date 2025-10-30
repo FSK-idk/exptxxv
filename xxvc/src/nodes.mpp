@@ -51,6 +51,12 @@ public:
         std::vector<std::unique_ptr<IdentifierNode>> args)
         : identifier_(std::move(identifier))
         , args_(std::move(args)) {}
+    auto identifier() const -> std::unique_ptr<IdentifierNode> const& {
+        return identifier_;
+    }
+    auto args() const -> std::vector<std::unique_ptr<IdentifierNode>> const& {
+        return args_;
+    }
 protected:
     std::unique_ptr<IdentifierNode> identifier_;
     std::vector<std::unique_ptr<IdentifierNode>> args_;
@@ -59,7 +65,9 @@ protected:
 export
 class FunctionStatementNode : public Node {
 public:
-    auto functionStatementType() -> FunctionStatementType { return functionStatementType_; }
+    auto functionStatementType() const -> FunctionStatementType {
+        return functionStatementType_;
+    }
 protected:
     FunctionStatementNode(FunctionStatementType type)
         : functionStatementType_(type) {}
@@ -72,6 +80,9 @@ public:
     ReturnStatementNode(std::unique_ptr<NumberNode> numberNode)
         : FunctionStatementNode(FunctionStatementType::eReturnStatement)
         , numberNode_(std::move(numberNode)) {}
+    auto number() const -> std::unique_ptr<NumberNode> const& {
+        return numberNode_;
+    }
 private:
     std::unique_ptr<NumberNode> numberNode_;
 };
@@ -79,7 +90,9 @@ private:
 export
 class ModuleStatementNode : public Node {
 public:
-    auto moduleStatementType() -> ModuleStatementType { return moduleStatementType_; }
+    auto moduleStatementType() const -> ModuleStatementType {
+        return moduleStatementType_;
+    }
 protected:
     ModuleStatementNode(ModuleStatementType type)
         : moduleStatementType_(type) {}
@@ -93,6 +106,9 @@ public:
         std::unique_ptr<FunctionPrototypeNode> prototype)
         : ModuleStatementNode(ModuleStatementType::eFunctionDeclaration)
         , functionPrototype_(std::move(prototype)) {}
+    auto functionPrototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
+        return functionPrototype_;
+    }
 private:
     std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
 };
@@ -106,6 +122,12 @@ public:
         : ModuleStatementNode(ModuleStatementType::eFunctionDefinition)
         , functionPrototype_(std::move(prototype))
         , body_(std::move(body)) {}
+    auto functionPrototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
+        return functionPrototype_;
+    }
+    auto body() const -> std::vector<std::unique_ptr<FunctionStatementNode>> const& {
+        return body_;
+    }
 private:
     std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
     std::vector<std::unique_ptr<FunctionStatementNode>> body_;
@@ -118,6 +140,9 @@ public:
         std::unique_ptr<FunctionPrototypeNode> prototype)
         : ModuleStatementNode(ModuleStatementType::eExternFunctionDeclaration)
         , functionPrototype_(std::move(prototype)) {}
+    auto functionPrototype() const -> std::unique_ptr<FunctionPrototypeNode> const& {
+        return functionPrototype_;
+    }
 private:
     std::unique_ptr<FunctionPrototypeNode> functionPrototype_;
 };
@@ -127,6 +152,9 @@ class ModuleNode : public Node {
 public:
     ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> statements)
         : moduleStatements_(std::move(statements)) {}
+    auto moduleStatements() const -> std::vector<std::unique_ptr<ModuleStatementNode>> const& {
+        return moduleStatements_;
+    }
 private:
     std::vector<std::unique_ptr<ModuleStatementNode>> moduleStatements_;
 };

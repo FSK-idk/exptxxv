@@ -99,14 +99,14 @@ private:
             return nullptr;
         }
         advanceToken();
-        std::vector<std::unique_ptr<IdentifierNode>> parameters;
+        std::vector<std::unique_ptr<IdentifierNode>> args;
         if (token()->type == TokenType::eRightRound) {
             advanceToken();
         }
         else {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
-            parameters.emplace_back(std::move(identifier));
+            args.emplace_back(std::move(identifier));
             while (true) {
                 if (token()->type == TokenType::eRightRound) {
                     advanceToken();
@@ -123,10 +123,10 @@ private:
                 }
                 auto identifier = parseIdentifier();
                 if (!identifier) return nullptr;
-                parameters.emplace_back(std::move(identifier));
+                args.emplace_back(std::move(identifier));
             }
         }
-        return std::make_unique<FunctionPrototypeNode>(std::move(identifier), std::move(parameters));
+        return std::make_unique<FunctionPrototypeNode>(std::move(identifier), std::move(args));
     }
 
     // function-statement

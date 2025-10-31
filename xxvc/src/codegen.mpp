@@ -11,6 +11,7 @@ module;
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/APFloat.h>
 #include <llvm/ADT/APInt.h>
+#include <llvm/Support/raw_os_ostream.h>
 
 export module codegen;
 
@@ -25,18 +26,22 @@ class Codegen {
 public:
     Codegen() {}
 
-    auto codegen(ModuleNode* moduleNode) -> void {
+    auto codegen(ModuleNode* moduleNode) -> std::string {
         context_ = std::make_unique<llvm::LLVMContext>();
         module_ = std::make_unique<llvm::Module>("main", *context_);
         builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);
 
         codegenModule(moduleNode);
 
-        module_->print(llvm::outs(), nullptr);
+        std::string output;
+        llvm::raw_string_ostream os(output);
+        module_->print(os, nullptr);
 
         builder_.reset();
         module_.reset();
         context_.reset();
+
+        return output;
     }
 
 private:

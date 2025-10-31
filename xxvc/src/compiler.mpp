@@ -1,6 +1,7 @@
 export module compiler;
 
 import std;
+import types;
 import tokens;
 import lexer;
 import nodes;
@@ -11,25 +12,34 @@ import codegen;
 export
 class Compiler {
 public:
-    Compiler() {}
+    Compiler(b8 printOpt = false) : printOpt_(printOpt) {}
 
-    auto exec(std::string program) -> void {
+    auto exec(std::string program, std::string const& outputFilename) -> bool {
         Lexer lexer;
-
         auto tokens = lexer.tokenize(program);
 
-        for (auto& token : tokens) {
-            printToken(token.get());
-            std::print(" ");
-        }
-        std::println();
-
         Parser parser;
-
         auto moduleNode = parser.parse(std::move(tokens));
+        if (!moduleNode) return false;
 
-        Codegen codeGenerator;
+        Codegen codegen;
+        auto output = codegen.codegen(moduleNode.get());
 
-        codeGenerator.codegen(moduleNode.get());
+        if (printOpt_) {
+            std::println("{:=<40}", "= input =");
+            std::print("{}", output);
+        }
+        else {
+            std::ofstream file(outputFilename);
+            if (file.fail()) {
+                std::println("couldn't find file {}", outputFilename);
+                return false;
+            }
+            file.write(&output[0], output.size());
+        }
+
+        return true;
     }
+private:
+    b8 printOpt_;
 };

@@ -40,7 +40,7 @@
         {
             "name": "debug",
             "cacheVariables": {
-                "CMAKE_CXX_FLAGS": "-O3 -Wall -stdlib=libstdc++ -rdynamic"
+                "CMAKE_CXX_FLAGS": "-O3 -Wall -stdlib=libstdc++"
             },
             "inherits": [
                 "base",
@@ -51,7 +51,7 @@
         {
             "name": "release",
             "cacheVariables": {
-                "CMAKE_CXX_FLAGS": "-O3 -Wall -stdlib=libstdc++ -rdynamic"
+                "CMAKE_CXX_FLAGS": "-O3 -Wall -stdlib=libstdc++"
             },
             "inherits": [
                 "base",

@@ -1,0 +1,350 @@
+#!/bin/lua
+
+
+local function info()
+    print('xxvb the builder tool')
+    print('type \'xxvb --help\' for help')
+end
+
+
+local function help()
+    print('xxvb the builder tool')
+    print('usage: xxvb [options] [command] [--help]')
+    print('options:')
+    print('  -h    --help                    show help info')
+    print('        --no-clear                don\'t clear terminal')
+    print('commands:')
+    print('  configure                       configure project')
+    print('  build                           build project')
+    print('  run                             compile and run program')
+    print('  clean                           clean project build files')
+end
+
+
+local function help_configure()
+    print('configures the project')
+    print('usage: xxvb configure [options]')
+    print('options:')
+    print('  -h    --help                    show help info')
+    print('        --debug                   configure debug mode (default)')
+    print('        --release                 configure release mode')
+end
+
+
+local function help_build()
+    print('configures and builds the project')
+    print('usage: xxvb build [options]')
+    print('options:')
+    print('  -h    --help                    show help info')
+    print('        --debug                   build in debug mode (default)')
+    print('        --release                 build in release mode')
+end
+
+
+local function help_run()
+    print('configures and builds the project then compiles and runs the example')
+    print('usage: xxvb run [options] [example]')
+    print('options:')
+    print('  -h    --help                    show help info')
+    print('        --print                   don\'t run example and print only LLVM IR')
+    print('        --debug                   run in debug mode (default)')
+    print('        --release                 run in release mode')
+end
+
+
+local function help_clean()
+    print('cleans the project build files')
+    print('usage: xxvb clean [options]')
+    print('options:')
+    print('  -h    --help                    show help info')
+end
+
+
+local function exec(cmd)
+    return os.execute(table.concat(cmd, ' '))
+end
+
+
+local function configure(mode)
+    local ok, _, code = exec {
+        'cmake',
+        '--preset ' .. mode,
+        '-Wno-dev',
+    }
+    if not ok then
+        print('failed to configure project. code ' .. code)
+        os.exit(-1)
+    end
+end
+
+
+local function copy_complile_commands(mode)
+    local ok, _, code = exec {
+        'cp',
+        'build/' .. mode .. '/compile_commands.json',
+        'build/compile_commands.json',
+    }
+    if not ok then
+        print('failed to configure project. code ' .. code)
+        os.exit(-1)
+    end
+end
+
+
+local function build(mode)
+    local ok, _, code = exec {
+        'cmake',
+        '--build',
+        '--preset ' .. mode,
+        '--target ' .. 'xxvc',
+    }
+    if not ok then
+        print('failed to build project. code ' .. code)
+        os.exit(-1)
+    end
+end
+
+
+local function clear()
+    exec { 'clear' }
+end
+
+
+local function create_directory(directory)
+    local ok, _, code = os.rename(directory, directory)
+    if not ok then
+        if code == 13 then return end
+        ok, _, code = exec {
+            'mkdir',
+            directory,
+        }
+        if not ok then
+            print('failed to create directory ' .. directory .. '. code ' .. code)
+            os.exit(-1)
+        end
+    end
+end
+
+local function compile(mode, print_opt, example)
+    if print_opt then
+        local ok, _, _ = exec {
+            './bin/' .. mode .. '/xxvc',
+            '--print',
+            './examples/' .. example .. '.xxv',
+        }
+        if not ok then
+            os.exit(-1)
+        end
+    else
+        create_directory('./bin/' .. mode .. '/examples')
+        local ok, _, _ = exec {
+            './bin/' .. mode .. '/xxvc',
+            '--output ./bin/' .. mode .. '/examples/' .. example .. '.ll',
+            './examples/' .. example .. '.xxv',
+        }
+        if not ok then
+            os.exit(-1)
+        end
+    end
+end
+
+
+local function compile_clang(mode, example)
+    local ok, _, _ = exec {
+        'clang',
+        '-o ./bin/' .. mode .. '/examples/' .. example,
+        './bin/' .. mode .. '/examples/' .. example .. '.ll',
+    }
+    if not ok then
+        os.exit(-1)
+    end
+end
+
+
+local function run(mode, example)
+    local _, _, code = exec {
+        './bin/' .. mode .. '/examples/' .. example
+    }
+    return code
+end
+
+
+local function clean()
+    local ok, _, code = exec {
+        'rm', '-rf', '.cache', 'build', 'bin'
+    }
+    if not ok then
+        print('failed to clean project. code ' .. code)
+        os.exit(-1)
+    end
+end
+
+
+local args = { ... }
+
+if #args == 0 then
+    info()
+    os.exit(0)
+end
+
+local clear_opt = true;
+
+local i = 1
+while i <= #args do
+    if string.sub(args[i], 1, 1) ~= '-' then
+        break
+    end
+
+    if args[i] == '-h' or args[i] == '--help' then
+        help()
+        os.exit(0)
+    elseif args[i] == '--no-clear' then
+        clear_opt = false
+    else
+        print('unknown option ' .. args[i])
+        os.exit(-1)
+    end
+
+    i = i + 1
+end
+
+if i == #args + 1 then
+    print('please specify command')
+    os.exit(-1)
+end
+
+if args[i] == 'configure' then
+    i = i + 1
+
+    local mode = 'debug'
+
+    while i <= #args do
+        if string.sub(args[i], 1, 1) ~= '-' then
+            break
+        end
+
+        if args[i] == '-h' or args[i] == '--help' then
+            help_configure()
+            os.exit(0)
+        elseif args[i] == '--release' then
+            mode = 'release'
+        elseif args[i] == '--debug' then
+            mode = 'debug'
+        else
+            print('unknown option ' .. args[i])
+            os.exit(-1)
+        end
+
+        i = i + 1
+    end
+
+    if clear_opt then clear() end
+    configure(mode)
+    copy_complile_commands(mode)
+
+    os.exit(0)
+elseif args[i] == 'build' then
+    i = i + 1
+
+    local mode = "debug"
+
+    while i <= #args do
+        if string.sub(args[i], 1, 1) ~= '-' then
+            break
+        end
+
+        if args[i] == '-h' or args[i] == '--help' then
+            help_build()
+            os.exit(0)
+        elseif args[i] == '--release' then
+            mode = 'release'
+        elseif args[i] == '--debug' then
+            mode = 'debug'
+        else
+            print('unknown option ' .. args[i])
+            os.exit(-1)
+        end
+
+        i = i + 1
+    end
+
+    if clear_opt then clear() end
+    configure(mode)
+    copy_complile_commands(mode)
+    build(mode)
+
+    os.exit(0)
+elseif args[i] == 'run' then
+    i = i + 1
+
+    local mode = 'debug'
+    local print_opt = false
+
+    while i <= #args do
+        if string.sub(args[i], 1, 1) ~= '-' then
+            break
+        end
+
+        if args[i] == '-h' or args[i] == '--help' then
+            help_run()
+            os.exit(0)
+        elseif args[i] == '--release' then
+            mode = 'release'
+        elseif args[i] == '--debug' then
+            mode = 'debug'
+        elseif args[i] == '--print' then
+            print_opt = true
+        else
+            print('unknown option ' .. args[i])
+            os.exit(-1)
+        end
+
+        i = i + 1
+    end
+
+    if i == #args + 1 then
+        print('please specify example')
+        os.exit(-1)
+    end
+
+    local example = args[i]
+
+    if clear_opt then clear() end
+    configure(mode)
+    copy_complile_commands(mode)
+    build(mode)
+    if clear_opt then clear() end
+    compile(mode, print_opt, example)
+
+    if print_opt then os.exit(0) end
+
+    compile_clang(mode, example)
+    if clear_opt then clear() end
+
+    os.exit(run(mode, example))
+elseif args[i] == 'clean' then
+    i = i + 1
+
+    while i <= #args do
+        if string.sub(args[i], 1, 1) ~= '-' then
+            break
+        end
+
+        if args[i] == '-h' or args[i] == '--help' then
+            help_clean()
+            os.exit(0)
+        else
+            print('unknown option ' .. args[i])
+            os.exit(-1)
+        end
+
+        i = i + 1
+    end
+
+    clean()
+
+    os.exit(0)
+else
+    print('unknown option or command ' .. args[i])
+    os.exit(-1)
+end

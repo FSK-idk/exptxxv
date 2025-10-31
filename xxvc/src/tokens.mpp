@@ -9,7 +9,7 @@ export
 enum class TokenType {
     eNumber,
     eIdentifier,
-    
+
     // reserved
     eExtern,
     eReturn,
@@ -51,21 +51,3 @@ struct NumberToken : Token {
             NumberToken{ { TokenType::eNumber }, value });
     }
 };
-
-export
-auto printToken(Token* token) -> void {
-    if      (token->type == TokenType::eNumber)     { std::print("number({})", static_cast<NumberToken*>(token)->value); }
-    else if (token->type == TokenType::eIdentifier) { std::print("identifier({})", static_cast<IdentifierToken*>(token)->name); }
-    else if (token->type == TokenType::eEof)        { std::print("eof"); }
-    else if (token->type == TokenType::eUnknown)    { std::print("unknown"); }
-    else if (token->type == TokenType::eColon)      { std::print("colon"); }
-    else if (token->type == TokenType::eSemicolon)  { std::print("semicolon"); }
-    else if (token->type == TokenType::eComma)      { std::print("comma"); }
-    else if (token->type == TokenType::eLeftRound)  { std::print("left_round"); }
-    else if (token->type == TokenType::eRightRound) { std::print("right_round"); }
-    else if (token->type == TokenType::eLeftCurly)  { std::print("left_curly"); }
-    else if (token->type == TokenType::eRightCurly) { std::print("right_curly"); }
-    else if (token->type == TokenType::eExtern)     { std::print("extern"); }
-    else if (token->type == TokenType::eReturn)     { std::print("return"); }
-    else                                            { std::print("UNHANDLED_TOKEN"); }
-}

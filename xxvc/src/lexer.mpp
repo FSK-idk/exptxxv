@@ -49,6 +49,10 @@ public:
             else if (program[i] == ')') { tokens.emplace_back(Token::Create(TokenType::eRightRoundBracket)); }
             else if (program[i] == '{') { tokens.emplace_back(Token::Create(TokenType::eLeftCurlyBracket)); }
             else if (program[i] == '}') { tokens.emplace_back(Token::Create(TokenType::eRightCurlyBracket)); }
+            else if (program[i] == '+') { tokens.emplace_back(Token::Create(TokenType::ePlus)); }
+            else if (program[i] == '-') { tokens.emplace_back(Token::Create(TokenType::eMinus)); }
+            else if (program[i] == '*') { tokens.emplace_back(Token::Create(TokenType::eAsterisk)); }
+            else if (program[i] == '/') { tokens.emplace_back(Token::Create(TokenType::eSlash)); }
             else                        { tokens.emplace_back(Token::Create(TokenType::eUnknown)); }
 
             ++i;

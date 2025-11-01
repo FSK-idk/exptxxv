@@ -6,10 +6,18 @@ import types;
 
 
 export
-enum class ModuleStatementType {
-    eFunctionDeclaration,
-    eFunctionDefinition,
-    eExternFunctionDeclaration,
+enum class ExpressionType {
+    eIdentifierExpression,
+    eNumberExpression,
+    eBinaryExpression,
+};
+
+export
+enum class BinaryOperatorType {
+    eAddition,
+    eSubtraction,
+    eMultiplication,
+    eDivision,
 };
 
 export
@@ -17,6 +25,12 @@ enum class FunctionStatementType {
     eReturnStatement,
 };
 
+export
+enum class ModuleStatementType {
+    eFunctionDeclaration,
+    eFunctionDefinition,
+    eExternFunctionDeclaration,
+};
 
 export
 class Node {
@@ -41,11 +55,87 @@ class NumberNode : public Node {
 public:
     NumberNode(f64 number)
         : value_(number) {}
-    auto value() -> f64 {
+    auto value() const -> f64 {
         return value_;
     }
 private:
     f64 value_;
+};
+
+export
+class BinaryOperatorNode : public Node {
+public:
+    BinaryOperatorNode(BinaryOperatorType type)
+        : type_(type) {}
+    auto type() const -> BinaryOperatorType {
+        return type_;
+    }
+private:
+    BinaryOperatorType type_;
+};
+
+export
+class ExpressionNode : public Node {
+public:
+    auto type() const -> ExpressionType {
+        return type_;
+    }
+protected:
+    ExpressionNode(ExpressionType type)
+        : type_(type) {}
+    ExpressionType type_;
+};
+
+export
+class IdentifierExpressionNode : public ExpressionNode {
+public:
+    IdentifierExpressionNode(std::unique_ptr<IdentifierNode> identifier)
+        : ExpressionNode(ExpressionType::eIdentifierExpression)
+        , identifier_(std::move(identifier)) {}
+    auto identifier() const -> std::unique_ptr<IdentifierNode> const& {
+        return identifier_;
+    }
+private:
+    std::unique_ptr<IdentifierNode> identifier_;
+};
+
+export
+class NumberExpressionNode : public ExpressionNode {
+public:
+    NumberExpressionNode(std::unique_ptr<NumberNode> number)
+        : ExpressionNode(ExpressionType::eNumberExpression)
+        , number_(std::move(number)) {}
+    auto number() const -> std::unique_ptr<NumberNode> const& {
+        return number_;
+    }
+private:
+    std::unique_ptr<NumberNode> number_;
+};
+
+export
+class BinaryExpressionNode : public ExpressionNode {
+public:
+    BinaryExpressionNode(
+        std::unique_ptr<BinaryOperatorNode> binaryOperator,
+        std::unique_ptr<ExpressionNode> lhs,
+        std::unique_ptr<ExpressionNode> rhs)
+        : ExpressionNode(ExpressionType::eBinaryExpression)
+        , binaryOperator_(std::move(binaryOperator))
+        , lhs_(std::move(lhs))
+        , rhs_(std::move(rhs)) {}
+    auto binaryOperator() const -> std::unique_ptr<BinaryOperatorNode> const& {
+        return binaryOperator_;
+    }
+    auto lhs() const -> std::unique_ptr<ExpressionNode> const& {
+        return lhs_;
+    }
+    auto rhs() const -> std::unique_ptr<ExpressionNode> const& {
+        return rhs_;
+    }
+private:
+    std::unique_ptr<BinaryOperatorNode> binaryOperator_;
+    std::unique_ptr<ExpressionNode> lhs_;
+    std::unique_ptr<ExpressionNode> rhs_;
 };
 
 export
@@ -82,14 +172,14 @@ protected:
 export
 class ReturnStatementNode : public FunctionStatementNode {
 public:
-    ReturnStatementNode(std::unique_ptr<NumberNode> number)
+    ReturnStatementNode(std::unique_ptr<ExpressionNode> expression)
         : FunctionStatementNode(FunctionStatementType::eReturnStatement)
-        , number_(std::move(number)) {}
-    auto number() const -> std::unique_ptr<NumberNode> const& {
-        return number_;
+        , expression_(std::move(expression)) {}
+    auto expression() const -> std::unique_ptr<ExpressionNode> const& {
+        return expression_;
     }
 private:
-    std::unique_ptr<NumberNode> number_;
+    std::unique_ptr<ExpressionNode> expression_;
 };
 
 export

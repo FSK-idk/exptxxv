@@ -24,6 +24,10 @@ enum class TokenType {
     eRightRoundBracket,
     eLeftCurlyBracket,
     eRightCurlyBracket,
+    ePlus,
+    eMinus,
+    eAsterisk,
+    eSlash,
 };
 
 export

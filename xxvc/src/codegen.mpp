@@ -49,6 +49,51 @@ private:
         return llvm::ConstantFP::get(*context_, llvm::APFloat(node->value()));
     }
 
+    auto codegenExpression(ExpressionNode* node) -> llvm::Value* {
+        if (node->type() == ExpressionType::eBinaryExpression) {
+            return codegenBinaryExpression(static_cast<BinaryExpressionNode*>(node));
+        }
+        else if (node->type() == ExpressionType::eIdentifierExpression) {
+            return codegenIdenifierExpression(static_cast<IdentifierExpressionNode*>(node));
+        }
+        else if (node->type() == ExpressionType::eNumberExpression) {
+            return codegenNumberExpression(static_cast<NumberExpressionNode*>(node));
+        }
+        return nullptr;
+    }
+
+    auto codegenBinaryExpression(BinaryExpressionNode* node) -> llvm::Value* {
+        auto lhs = codegenExpression(node->lhs().get());
+        auto rhs = codegenExpression(node->rhs().get());
+        if (!lhs || !rhs) return nullptr;
+        if (node->binaryOperator()->type() == BinaryOperatorType::eAddition) {
+            return builder_->CreateFAdd(lhs, rhs, "addtmp");
+        }
+        if (node->binaryOperator()->type() == BinaryOperatorType::eSubtraction) {
+            return builder_->CreateFSub(lhs, rhs, "subtmp");
+        }
+        if (node->binaryOperator()->type() == BinaryOperatorType::eMultiplication) {
+            return builder_->CreateFMul(lhs, rhs, "multmp");
+        }
+        if (node->binaryOperator()->type() == BinaryOperatorType::eDivision) {
+            return builder_->CreateFDiv(lhs, rhs, "divtmp");
+        }
+        return nullptr;
+    }
+
+    auto codegenIdenifierExpression(IdentifierExpressionNode* node) -> llvm::Value* {
+        if (!variables_.contains(node->identifier()->name())) {
+            std::println("unknown variable name");
+            return nullptr;
+        }
+        llvm::AllocaInst* alloca = variables_[node->identifier()->name()];
+        return builder_->CreateLoad(alloca->getAllocatedType(), alloca, node->identifier()->name());
+    }
+
+    auto codegenNumberExpression(NumberExpressionNode* node) -> llvm::Value* {
+        return codegenNumber(node->number().get());
+    }
+
     auto codegenFunctionPrototype(FunctionPrototypeNode* node) -> llvm::Function* {
         // TODO: remove after types are introduced
         if (node->identifier()->name() == "main") {
@@ -75,11 +120,12 @@ private:
     auto codegenReturnStatement(ReturnStatementNode* node) -> llvm::Value* {
         // TODO: remove after types are introduced
         if (isMainFunction_) {
-            auto number = llvm::ConstantInt::get(*context_, llvm::APInt(32, static_cast<u64>(node->number()->value()), true));
-            return builder_->CreateRet(number);
+            auto expression = codegenExpression(node->expression().get());
+            auto castedExpression = builder_->CreateCast(llvm::Instruction::CastOps::FPToSI, expression, llvm::Type::getInt32Ty(*context_));
+            return builder_->CreateRet(castedExpression);
         }
-        auto number = codegenNumber(node->number().get());
-        return builder_->CreateRet(number);
+        auto expression = codegenExpression(node->expression().get());
+        return builder_->CreateRet(expression);
     }
 
     auto codegenModuleStatement(ModuleStatementNode* node) -> void {
@@ -149,5 +195,6 @@ private:
     std::unique_ptr<llvm::IRBuilder<>> builder_;
 
     std::map<std::string, llvm::Function*> functions_;
+    std::map<std::string, llvm::AllocaInst*> variables_;
     bool isMainFunction_;
 };

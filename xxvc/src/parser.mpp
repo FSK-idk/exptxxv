@@ -94,13 +94,13 @@ private:
             return nullptr;
         }
         advanceToken();
-        if (token()->type != TokenType::eLeftRound) {
+        if (token()->type != TokenType::eLeftRoundBracket) {
             std::println("expected left round");
             return nullptr;
         }
         advanceToken();
         std::vector<std::unique_ptr<IdentifierNode>> args;
-        if (token()->type == TokenType::eRightRound) {
+        if (token()->type == TokenType::eRightRoundBracket) {
             advanceToken();
         }
         else {
@@ -108,7 +108,7 @@ private:
             if (!identifier) return nullptr;
             args.emplace_back(std::move(identifier));
             while (true) {
-                if (token()->type == TokenType::eRightRound) {
+                if (token()->type == TokenType::eRightRoundBracket) {
                     advanceToken();
                     break;
                 }
@@ -117,7 +117,7 @@ private:
                     return nullptr;
                 }
                 advanceToken();
-                if (token()->type == TokenType::eRightRound) {
+                if (token()->type == TokenType::eRightRoundBracket) {
                     advanceToken();
                     break;
                 }
@@ -181,14 +181,14 @@ private:
                 return std::make_unique<FunctionDeclarationNode>(std::move(prototype));
             }
         }
-        if (token()->type != TokenType::eLeftCurly) {
+        if (token()->type != TokenType::eLeftCurlyBracket) {
             std::println("expected curly");
             return nullptr;
         }
         advanceToken();
         std::vector<std::unique_ptr<FunctionStatementNode>> body;
         while (true) {
-            if (token()->type == TokenType::eRightCurly) {
+            if (token()->type == TokenType::eRightCurlyBracket) {
                 advanceToken();
                 break;
             }

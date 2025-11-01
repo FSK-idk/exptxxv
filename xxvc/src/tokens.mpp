@@ -20,10 +20,10 @@ enum class TokenType {
     eColon,
     eSemicolon,
     eComma,
-    eLeftRound,
-    eRightRound,
-    eLeftCurly,
-    eRightCurly,
+    eLeftRoundBracket,
+    eRightRoundBracket,
+    eLeftCurlyBracket,
+    eRightCurlyBracket,
 };
 
 export

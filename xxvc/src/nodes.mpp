@@ -6,13 +6,6 @@ import types;
 
 
 export
-enum class ExpressionType {
-    eIdentifierExpression,
-    eNumberExpression,
-    eBinaryExpression,
-};
-
-export
 enum class BinaryOperatorType {
     eAddition,
     eSubtraction,
@@ -21,7 +14,16 @@ enum class BinaryOperatorType {
 };
 
 export
+enum class ExpressionType {
+    eBinaryExpression,
+    eVariableExpression,
+    eNumberExpression,
+};
+
+export
 enum class FunctionStatementType {
+    eVariableDeclaration,
+    eVariableDefinition,
     eReturnStatement,
 };
 
@@ -110,13 +112,13 @@ private:
 };
 
 export
-class IdentifierExpressionNode : public ExpressionNode {
+class VariableExpressionNode : public ExpressionNode {
 public:
-    static auto Create(std::unique_ptr<IdentifierNode> identifier) -> std::unique_ptr<IdentifierExpressionNode> {
-        return std::make_unique<IdentifierExpressionNode>(std::move(identifier));
+    static auto Create(std::unique_ptr<IdentifierNode> identifier) -> std::unique_ptr<VariableExpressionNode> {
+        return std::make_unique<VariableExpressionNode>(std::move(identifier));
     }
-    IdentifierExpressionNode(std::unique_ptr<IdentifierNode> identifier)
-        : ExpressionNode(ExpressionType::eIdentifierExpression)
+    VariableExpressionNode(std::unique_ptr<IdentifierNode> identifier)
+        : ExpressionNode(ExpressionType::eVariableExpression)
         , identifier_(std::move(identifier)) {}
     auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
 private:
@@ -144,6 +146,41 @@ public:
 protected:
     FunctionStatementNode(FunctionStatementType type) : type_(type) {}
     FunctionStatementType type_;
+};
+
+export
+class VariableDeclarationNode : public FunctionStatementNode {
+public:
+    static auto Create(std::unique_ptr<IdentifierNode> identifier) -> std::unique_ptr<VariableDeclarationNode> {
+        return std::make_unique<VariableDeclarationNode>(std::move(identifier));
+    }
+    VariableDeclarationNode(std::unique_ptr<IdentifierNode> identifier)
+        : FunctionStatementNode(FunctionStatementType::eVariableDeclaration)
+        , identifier_(std::move(identifier)) {}
+    auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
+private:
+    std::unique_ptr<IdentifierNode> identifier_;
+};
+
+export
+class VariableDefinitionNode : public FunctionStatementNode {
+public:
+    static auto Create(
+        std::unique_ptr<IdentifierNode> identifier,
+        std::unique_ptr<ExpressionNode> expression) -> std::unique_ptr<VariableDefinitionNode> {
+        return std::make_unique<VariableDefinitionNode>(std::move(identifier), std::move(expression));
+    }
+    VariableDefinitionNode(
+        std::unique_ptr<IdentifierNode> identifier,
+        std::unique_ptr<ExpressionNode> expression)
+        : FunctionStatementNode(FunctionStatementType::eVariableDefinition)
+        , identifier_(std::move(identifier))
+        , expression_(std::move(expression)) {}
+    auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
+    auto expression() const -> std::unique_ptr<ExpressionNode> const& { return expression_; }
+private:
+    std::unique_ptr<IdentifierNode> identifier_;
+    std::unique_ptr<ExpressionNode> expression_;
 };
 
 export

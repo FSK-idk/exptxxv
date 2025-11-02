@@ -27,7 +27,13 @@ import nodes;
 //   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
 //
 // function-statement
+//   ::= variable-declaration
+//   ::= variable-definition
 //   ::= return-statement
+// variable-declaration
+//   ::= identifier ';'
+// variable-definition
+//   ::= identifier ':' '{' expression '}' ';'
 // return-statement
 //   ::= 'return' expression ';'
 //
@@ -38,9 +44,9 @@ import nodes;
 //   ::= expression binary-operator expression
 // primary-expression
 //   ::= '(' expression ')'
-//   ::= identifier-expression
+//   ::= variable-expression
 //   ::= number-expression
-// identifier-expression
+// variable-expression
 //   ::= identifier
 // number-expression
 //   ::= number
@@ -186,30 +192,61 @@ private:
     }
 
     // function-statement
+    //   ::= variable-declaration
+    //   ::= variable-definition
     //   ::= return-statement
-    auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
-        auto returnStatement = parseReturnStatement();
-        if (!returnStatement) return nullptr;
-        return returnStatement;
-    };
-
+    // variable-declaration
+    //   ::= identifier ';'
+    // variable-definition
+    //   ::= identifier ':' '{' expression '}' ';'
     // return-statement
     //   ::= 'return' expression ';'
-    auto parseReturnStatement() -> std::unique_ptr<ReturnStatementNode> {
-        if (token()->type != TokenType::eReturn) {
-            std::println("expected 'return'");
-            return nullptr;
+    auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
+        if (token()->type == TokenType::eIdentifier) {
+            auto identifier = parseIdentifier();
+            if (!identifier) return nullptr;
+            if (token()->type == TokenType::eSemicolon) {
+                advanceToken();
+                return VariableDeclarationNode::Create(std::move(identifier));
+            }
+            if (token()->type != TokenType::eColon) {
+                std::println("exprected colon");
+                return nullptr;
+            }
+            advanceToken();
+            if (token()->type != TokenType::eLeftCurlyBracket) {
+                std::println("exprected left curly bracket");
+                return nullptr;
+            }
+            advanceToken();
+            auto expression = parseExpression();
+            if (!expression) return nullptr;
+            if (token()->type != TokenType::eRightCurlyBracket) {
+                std::println("exprected right curly bracket");
+                return nullptr;
+            }
+            advanceToken();
+            if (token()->type != TokenType::eSemicolon) {
+                std::println("exprected semicolon");
+                return nullptr;
+            }
+            advanceToken();
+            return VariableDefinitionNode::Create(std::move(identifier), std::move(expression));
         }
-        advanceToken();
-        auto expression = parseExpression();
-        if (!expression) return nullptr;
-        if (token()->type != TokenType::eSemicolon) {
-            std::println("expected semicolon");
-            return nullptr;
+        else if (token()->type == TokenType::eReturn) {
+            advanceToken();
+            auto expression = parseExpression();
+            if (!expression) return nullptr;
+            if (token()->type != TokenType::eSemicolon) {
+                std::println("expected semicolon");
+                return nullptr;
+            }
+            advanceToken();
+            return ReturnStatementNode::Create(std::move(expression));
         }
-        advanceToken();
-        return ReturnStatementNode::Create(std::move(expression));
-    }
+        std::println("expected function statement");
+        return nullptr;
+    };
 
     // expression
     //   ::= primary-expression
@@ -224,9 +261,9 @@ private:
 
     // primary-expression
     //   ::= '(' expression ')'
-    //   ::= identifier-expression
+    //   ::= variable-expression
     //   ::= number-expression
-    // identifier-expression
+    // variable-expression
     //   ::= identifier
     // number-expression
     //   ::= number
@@ -245,7 +282,7 @@ private:
         if (token()->type == TokenType::eIdentifier) {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
-            return IdentifierExpressionNode::Create(std::move(identifier));
+            return VariableExpressionNode::Create(std::move(identifier));
         }
         if (token()->type == TokenType::eNumber) {
             auto number = parseNumber();

@@ -53,8 +53,8 @@ private:
         if (node->type() == ExpressionType::eBinaryExpression) {
             return codegenBinaryExpression(static_cast<BinaryExpressionNode*>(node));
         }
-        else if (node->type() == ExpressionType::eIdentifierExpression) {
-            return codegenIdenifierExpression(static_cast<IdentifierExpressionNode*>(node));
+        else if (node->type() == ExpressionType::eVariableExpression) {
+            return codegenVariableExpression(static_cast<VariableExpressionNode*>(node));
         }
         else if (node->type() == ExpressionType::eNumberExpression) {
             return codegenNumberExpression(static_cast<NumberExpressionNode*>(node));
@@ -81,7 +81,7 @@ private:
         return nullptr;
     }
 
-    auto codegenIdenifierExpression(IdentifierExpressionNode* node) -> llvm::Value* {
+    auto codegenVariableExpression(VariableExpressionNode* node) -> llvm::Value* {
         if (!variables_.contains(node->identifier()->name())) {
             std::println("unknown variable name");
             return nullptr;
@@ -110,11 +110,31 @@ private:
         return function;
     }
 
-    auto codegenFunctionStatement(FunctionStatementNode* node) -> llvm::Value* {
-        if (node->type() == FunctionStatementType::eReturnStatement) {
-            return codegenReturnStatement(static_cast<ReturnStatementNode*>(node));
+    auto codegenFunctionStatement(FunctionStatementNode* node) -> void {
+        if (node->type() == FunctionStatementType::eVariableDeclaration) {
+            codegenVariableDeclaration(static_cast<VariableDeclarationNode*>(node));
         }
-        return nullptr;
+        else if (node->type() == FunctionStatementType::eVariableDefinition) {
+            codegenVariableDefinition(static_cast<VariableDefinitionNode*>(node));
+        }
+        else if (node->type() == FunctionStatementType::eReturnStatement) {
+            codegenReturnStatement(static_cast<ReturnStatementNode*>(node));
+        }
+    }
+
+    auto codegenVariableDeclaration(VariableDeclarationNode* node) -> void {
+        auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->identifier()->name());
+        variables_[node->identifier()->name()] = alloca;
+    }
+
+    auto codegenVariableDefinition(VariableDefinitionNode* node) -> void {
+        if (!variables_.contains(node->identifier()->name())) {
+            auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->identifier()->name());
+            variables_[node->identifier()->name()] = alloca;
+        }
+        auto alloca = variables_[node->identifier()->name()];
+        auto expression = codegenExpression(node->expression().get());
+        builder_->CreateStore(expression, alloca);
     }
 
     auto codegenReturnStatement(ReturnStatementNode* node) -> llvm::Value* {

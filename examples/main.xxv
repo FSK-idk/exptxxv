@@ -1,3 +1,6 @@
 main: () {
-    return 4 + 4 * (3 + 2) * (3 * 3 * (1 + 1)) - 2;
+    vara;
+    vara: { 2 };
+    varb: { vara * 5 };
+    return varb * 2;
 };

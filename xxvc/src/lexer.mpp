@@ -26,9 +26,11 @@ public:
             if (std::isalpha(program[i])) {
                 u64 j = i + 1; while (j < size && std::isalnum(program[j])) ++j;
                 std::string_view name = std::string_view{ program.data() + i, program.data() + j };
-                if      (name == "extern") { tokens.emplace_back(Token::Create(TokenType::eExtern)); }
-                else if (name == "return") { tokens.emplace_back(Token::Create(TokenType::eReturn)); }
-                else                       { tokens.emplace_back(IdentifierToken::Create(std::string(name))); }
+                std::unique_ptr<Token> token;
+                if      (name == "extern") { token = Token::Create(TokenType::eExtern); }
+                else if (name == "return") { token = Token::Create(TokenType::eReturn); }
+                else                       { token = IdentifierToken::Create(std::string(name)); }
+                tokens.emplace_back(std::move(token));
                 i = j; continue;
             }
 
@@ -42,18 +44,20 @@ public:
             }
 
             // special
-            if      (program[i] == ':') { tokens.emplace_back(Token::Create(TokenType::eColon)); }
-            else if (program[i] == ';') { tokens.emplace_back(Token::Create(TokenType::eSemicolon)); }
-            else if (program[i] == ',') { tokens.emplace_back(Token::Create(TokenType::eComma)); }
-            else if (program[i] == '(') { tokens.emplace_back(Token::Create(TokenType::eLeftRoundBracket)); }
-            else if (program[i] == ')') { tokens.emplace_back(Token::Create(TokenType::eRightRoundBracket)); }
-            else if (program[i] == '{') { tokens.emplace_back(Token::Create(TokenType::eLeftCurlyBracket)); }
-            else if (program[i] == '}') { tokens.emplace_back(Token::Create(TokenType::eRightCurlyBracket)); }
-            else if (program[i] == '+') { tokens.emplace_back(Token::Create(TokenType::ePlus)); }
-            else if (program[i] == '-') { tokens.emplace_back(Token::Create(TokenType::eMinus)); }
-            else if (program[i] == '*') { tokens.emplace_back(Token::Create(TokenType::eAsterisk)); }
-            else if (program[i] == '/') { tokens.emplace_back(Token::Create(TokenType::eSlash)); }
-            else                        { tokens.emplace_back(Token::Create(TokenType::eUnknown)); }
+            std::unique_ptr<Token> token;
+            if      (program[i] == ':') { token = Token::Create(TokenType::eColon); }
+            else if (program[i] == ';') { token = Token::Create(TokenType::eSemicolon); }
+            else if (program[i] == ',') { token = Token::Create(TokenType::eComma); }
+            else if (program[i] == '(') { token = Token::Create(TokenType::eLeftRoundBracket); }
+            else if (program[i] == ')') { token = Token::Create(TokenType::eRightRoundBracket); }
+            else if (program[i] == '{') { token = Token::Create(TokenType::eLeftCurlyBracket); }
+            else if (program[i] == '}') { token = Token::Create(TokenType::eRightCurlyBracket); }
+            else if (program[i] == '+') { token = Token::Create(TokenType::ePlus); }
+            else if (program[i] == '-') { token = Token::Create(TokenType::eMinus); }
+            else if (program[i] == '*') { token = Token::Create(TokenType::eAsterisk); }
+            else if (program[i] == '/') { token = Token::Create(TokenType::eSlash); }
+            else                        { token = Token::Create(TokenType::eUnknown); }
+            tokens.emplace_back(std::move(token));
 
             ++i;
         }

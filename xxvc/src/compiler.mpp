@@ -20,7 +20,10 @@ public:
 
         Parser parser;
         auto moduleNode = parser.parse(std::move(tokens));
-        if (!moduleNode) return false;
+        if (!moduleNode) {
+            std::println("parse failed");
+            return false;
+        }
 
         Codegen codegen;
         auto output = codegen.codegen(moduleNode.get());

@@ -1,6 +1,5 @@
 main: () {
-    vara;
-    vara: { 2 };
-    varb: { vara * 5 };
+    vara: {};
+    varb: { vara * 5 + 4 };
     return varb * 2;
 };

@@ -133,8 +133,14 @@ private:
             variables_[node->identifier()->name()] = alloca;
         }
         auto alloca = variables_[node->identifier()->name()];
-        auto expression = codegenExpression(node->expression().get());
-        builder_->CreateStore(expression, alloca);
+        if (node->expression()) {
+            auto expression = codegenExpression(node->expression().get());
+            builder_->CreateStore(expression, alloca);
+        }
+        else {
+            auto value = llvm::ConstantFP::get(*context_, llvm::APFloat(0.0));
+            builder_->CreateStore(value, alloca);
+        }
     }
 
     auto codegenReturnStatement(ReturnStatementNode* node) -> llvm::Value* {

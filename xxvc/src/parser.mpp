@@ -33,7 +33,7 @@ import nodes;
 // variable-declaration
 //   ::= identifier ';'
 // variable-definition
-//   ::= identifier ':' '{' expression '}' ';'
+//   ::= identifier ':' '{' expression? '}' ';'
 // return-statement
 //   ::= 'return' expression ';'
 //
@@ -198,7 +198,7 @@ private:
     // variable-declaration
     //   ::= identifier ';'
     // variable-definition
-    //   ::= identifier ':' '{' expression '}' ';'
+    //   ::= identifier ':' '{' expression? '}' ';'
     // return-statement
     //   ::= 'return' expression ';'
     auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
@@ -219,6 +219,15 @@ private:
                 return nullptr;
             }
             advanceToken();
+            if (token()->type == TokenType::eRightCurlyBracket) {
+                advanceToken();
+                if (token()->type != TokenType::eSemicolon) {
+                    std::println("exprected semicolon");
+                    return nullptr;
+                }
+                advanceToken();
+                return VariableDefinitionNode::Create(std::move(identifier), nullptr);
+            }
             auto expression = parseExpression();
             if (!expression) return nullptr;
             if (token()->type != TokenType::eRightCurlyBracket) {
@@ -311,7 +320,7 @@ private:
             auto rhs = parsePrimaryExpression();
             if (!rhs) return nullptr;
             auto nextBinaryOperator = peekBinaryOperator();
-            if (nextBinaryOperator && currentPrecedence < precedence[nextBinaryOperator->type()]) {
+            if (nextBinaryOperator && precedence[binaryOperator->type()] < precedence[nextBinaryOperator->type()]) {
                 rhs = parseBinaryExpressionRhs(precedence[nextBinaryOperator->type()], std::move(rhs));
                 if (!rhs) return nullptr;
             }

@@ -11,6 +11,9 @@ class Printer {
 public:
     Printer() : step_(2), space_(-step_) {}
 
+    template <class T>
+    auto print(T const& node) -> void;
+
     auto print(ModuleNode const& node) -> void {
         advance();
         indent(); std::println("module");

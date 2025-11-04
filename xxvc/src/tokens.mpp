@@ -31,25 +31,31 @@ enum class TokenType {
 };
 
 export
-struct Token {
-    TokenType type;
-    static auto Create(TokenType type) -> std::unique_ptr<Token> {
-        return std::make_unique<Token>(Token{ type });
-    }
+class Token {
+public:
+    Token(TokenType type) : type_(type) {}
+    virtual ~Token() {}
+    auto type() const -> TokenType { return type_; }
+private:
+    TokenType type_;
 };
 
 export
-struct IdentifierToken : Token {
-    std::string name;
-    static auto Create(std::string name) -> std::unique_ptr<IdentifierToken> {
-        return std::make_unique<IdentifierToken>(IdentifierToken{ { TokenType::eIdentifier }, std::move(name) });
-    }
+class IdentifierToken : public Token {
+public:
+    IdentifierToken(std::string name)
+        : Token(TokenType::eIdentifier), name_(std::move(name)) {}
+    auto name() const -> std::string const& { return name_; }
+private:
+    std::string name_;
 };
 
 export
-struct NumberToken : Token {
-    f64 value;
-    static auto Create(f64 value) -> std::unique_ptr<NumberToken> {
-        return std::make_unique<NumberToken>(NumberToken{ { TokenType::eNumber }, value });
-    }
+class NumberToken : public Token {
+public:
+    NumberToken(f64 value)
+        : Token(TokenType::eNumber), value_(value) {}
+    auto value() const -> f64 { return value_; }
+private:
+    f64 value_;
 };

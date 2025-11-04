@@ -67,19 +67,17 @@ import nodes;
 export
 class Parser {
 public:
-    Parser() {}
+    Parser(std::vector<Token*> const& tokens) : tokens_(tokens) {}
 
-    auto parse(std::vector<std::unique_ptr<Token>> tokens) -> std::unique_ptr<ModuleNode> {
-        tokens_ = std::move(tokens);
+    auto parse() -> std::unique_ptr<ModuleNode> {
         tokenIndex_ = 0;
         auto moduleNode = parseModule();
-        tokens_.clear();
         return moduleNode;
     }
 
 private:
     auto token() -> Token* {
-        return tokens_[tokenIndex_].get();
+        return tokens_[tokenIndex_];
     }
 
     auto advanceToken() -> void {
@@ -91,7 +89,7 @@ private:
     auto parseModule() -> std::unique_ptr<ModuleNode> {
         std::vector<std::unique_ptr<ModuleStatementNode>> body;
         while (true) {
-            if (token()->type == TokenType::eEof) {
+            if (token()->type() == TokenType::eEof) {
                 advanceToken();
                 break;
             }
@@ -114,12 +112,13 @@ private:
     //   ::= 'extern' function-prototype ';'
     auto parseModuleStatement() -> std::unique_ptr<ModuleStatementNode> {
         b8 isExtern = false;
-        if (token()->type == TokenType::eExtern) {
+        if (token()->type() == TokenType::eExtern) {
             isExtern = true;
             advanceToken();
         }
         auto prototype = parseFunctionPrototype();
-        if (token()->type == TokenType::eSemicolon) {
+        if (!prototype) return nullptr;
+        if (token()->type() == TokenType::eSemicolon) {
             advanceToken();
             if (isExtern) {
                 return ExternFunctionDeclarationNode::Create(std::move(prototype));
@@ -128,14 +127,14 @@ private:
                 return FunctionDeclarationNode::Create(std::move(prototype));
             }
         }
-        if (token()->type != TokenType::eLeftCurlyBracket) {
+        if (token()->type() != TokenType::eLeftCurlyBracket) {
             std::println("expected left curly bracket");
             return nullptr;
         }
         advanceToken();
         std::vector<std::unique_ptr<FunctionStatementNode>> body;
         while (true) {
-            if (token()->type == TokenType::eRightCurlyBracket) {
+            if (token()->type() == TokenType::eRightCurlyBracket) {
                 advanceToken();
                 break;
             }
@@ -143,7 +142,7 @@ private:
             if (!statement) return nullptr;
             body.emplace_back(std::move(statement));
         }
-        if (token()->type != TokenType::eSemicolon) {
+        if (token()->type() != TokenType::eSemicolon) {
             std::println("expected semicolon");
             return nullptr;
         }
@@ -156,18 +155,18 @@ private:
     auto parseFunctionPrototype() -> std::unique_ptr<FunctionPrototypeNode> {
         auto identifier = parseIdentifier();
         if (!identifier) return nullptr;
-        if (token()->type != TokenType::eColon) {
+        if (token()->type() != TokenType::eColon) {
             std::println("expected colon");
             return nullptr;
         }
         advanceToken();
-        if (token()->type != TokenType::eLeftRoundBracket) {
+        if (token()->type() != TokenType::eLeftRoundBracket) {
             std::println("expected left round bracket");
             return nullptr;
         }
         advanceToken();
         std::vector<std::unique_ptr<IdentifierNode>> args;
-        if (token()->type == TokenType::eRightRoundBracket) {
+        if (token()->type() == TokenType::eRightRoundBracket) {
             advanceToken();
         }
         else {
@@ -175,16 +174,16 @@ private:
             if (!identifier) return nullptr;
             args.emplace_back(std::move(identifier));
             while (true) {
-                if (token()->type == TokenType::eRightRoundBracket) {
+                if (token()->type() == TokenType::eRightRoundBracket) {
                     advanceToken();
                     break;
                 }
-                if (token()->type != TokenType::eComma) {
+                if (token()->type() != TokenType::eComma) {
                     std::println("expected comma");
                     return nullptr;
                 }
                 advanceToken();
-                if (token()->type == TokenType::eRightRoundBracket) {
+                if (token()->type() == TokenType::eRightRoundBracket) {
                     advanceToken();
                     break;
                 }
@@ -207,42 +206,42 @@ private:
     // return-statement
     //   ::= 'return' expression ';'
     auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
-        if (token()->type == TokenType::eIdentifier) {
+        if (token()->type() == TokenType::eIdentifier) {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
-            if (token()->type == TokenType::eSemicolon) {
+            if (token()->type() == TokenType::eSemicolon) {
                 advanceToken();
                 return VariableDeclarationNode::Create(std::move(identifier));
             }
-            if (token()->type != TokenType::eColon) {
+            if (token()->type() != TokenType::eColon) {
                 std::println("exprected colon");
                 return nullptr;
             }
             advanceToken();
-            if (token()->type != TokenType::eLeftCurlyBracket) {
+            if (token()->type() != TokenType::eLeftCurlyBracket) {
                 std::println("exprected left curly bracket");
                 return nullptr;
             }
             advanceToken();
             auto expression = parseExpression();
             if (!expression) return nullptr;
-            if (token()->type != TokenType::eRightCurlyBracket) {
+            if (token()->type() != TokenType::eRightCurlyBracket) {
                 std::println("exprected right curly bracket");
                 return nullptr;
             }
             advanceToken();
-            if (token()->type != TokenType::eSemicolon) {
+            if (token()->type() != TokenType::eSemicolon) {
                 std::println("exprected semicolon");
                 return nullptr;
             }
             advanceToken();
             return VariableDefinitionNode::Create(std::move(identifier), std::move(expression));
         }
-        else if (token()->type == TokenType::eReturn) {
+        else if (token()->type() == TokenType::eReturn) {
             advanceToken();
             auto expression = parseExpression();
             if (!expression) return nullptr;
-            if (token()->type != TokenType::eSemicolon) {
+            if (token()->type() != TokenType::eSemicolon) {
                 std::println("expected semicolon");
                 return nullptr;
             }
@@ -277,23 +276,23 @@ private:
     // empty-expression
     //   ::=
     auto parsePrimaryExpression() -> std::unique_ptr<ExpressionNode> {
-        if (token()->type == TokenType::eLeftRoundBracket) {
+        if (token()->type() == TokenType::eLeftRoundBracket) {
             advanceToken();
             auto expression = parseExpression();
             if (!expression) return nullptr;
-            if (token()->type != TokenType::eRightRoundBracket) {
+            if (token()->type() != TokenType::eRightRoundBracket) {
                 std::println("expected right round bracket");
                 return nullptr;
             }
             advanceToken();
             return expression;
         }
-        if (token()->type == TokenType::eIdentifier) {
+        if (token()->type() == TokenType::eIdentifier) {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
             return VariableExpressionNode::Create(std::move(identifier));
         }
-        if (token()->type == TokenType::eNumber) {
+        if (token()->type() == TokenType::eNumber) {
             auto number = parseNumber();
             if (!number) return nullptr;
             return NumberExpressionNode::Create(std::move(number));
@@ -340,40 +339,40 @@ private:
     // identifier
     //   ::= identifier-token
     auto parseIdentifier() -> std::unique_ptr<IdentifierNode> {
-        if (token()->type != TokenType::eIdentifier) {
+        if (token()->type() != TokenType::eIdentifier) {
             std::println("expected identifier");
             return nullptr;
         }
         auto identifier = static_cast<IdentifierToken*>(token());
         advanceToken();
-        return IdentifierNode::Create(std::move(identifier->name));
+        return IdentifierNode::Create(identifier->name());
     }
 
     // number
     //   ::= number-token
     auto parseNumber() -> std::unique_ptr<NumberNode> {
-        if (token()->type != TokenType::eNumber) {
+        if (token()->type() != TokenType::eNumber) {
             std::println("expected number");
             return nullptr;
         }
         auto number = static_cast<NumberToken*>(token());
         advanceToken();
-        return NumberNode::Create(number->value);
+        return NumberNode::Create(number->value());
     }
 
     // binary-operator
     //   ::= '+' | '-' | '*' | '/'
     auto peekBinaryOperator() -> std::unique_ptr<BinaryOperatorNode> {
         BinaryOperatorType type;
-        if      (token()->type == TokenType::ePlus)     { type = BinaryOperatorType::eAddition; }
-        else if (token()->type == TokenType::eMinus)    { type = BinaryOperatorType::eSubtraction; }
-        else if (token()->type == TokenType::eAsterisk) { type = BinaryOperatorType::eMultiplication; }
-        else if (token()->type == TokenType::eSlash)    { type = BinaryOperatorType::eDivision; }
-        else                                            { return nullptr; }
+        if      (token()->type() == TokenType::ePlus)     { type = BinaryOperatorType::eAddition; }
+        else if (token()->type() == TokenType::eMinus)    { type = BinaryOperatorType::eSubtraction; }
+        else if (token()->type() == TokenType::eAsterisk) { type = BinaryOperatorType::eMultiplication; }
+        else if (token()->type() == TokenType::eSlash)    { type = BinaryOperatorType::eDivision; }
+        else                                              { return nullptr; }
         return BinaryOperatorNode::Create(type);
     }
 
 private:
-    std::vector<std::unique_ptr<Token>> tokens_;
+    std::vector<Token*> const& tokens_;
     u64 tokenIndex_;
 };

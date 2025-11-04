@@ -9,61 +9,76 @@ import tokens;
 export
 class Lexer {
 public:
-    Lexer() {}
+    Lexer(std::string program) : program_(std::move(program)) {}
 
-    auto tokenize(std::string const& program) -> std::vector<std::unique_ptr<Token>> {
-        std::vector<std::unique_ptr<Token>> tokens;
+    ~Lexer() {
+        for (auto token : tokens_) {
+            switch (token->type()) {
+            case TokenType::eIdentifier:
+                delete static_cast<IdentifierToken*>(token); break;
+            case TokenType::eNumber:
+                delete static_cast<NumberToken*>(token); break;
+            default:
+                delete token; break;
+            }
+        }
+    }
 
-        u64 size = program.size();
+    auto tokenize() -> void {
+        u64 size = program_.size();
 
         u64 i = 0;
         while (i < size) {
             // spaces
-            while (i < size && std::isspace(program[i])) ++i;
+            while (i < size && std::isspace(program_[i])) ++i;
             if (i == size) break;
 
             // identifier or reserved
-            if (std::isalpha(program[i])) {
-                u64 j = i + 1; while (j < size && std::isalnum(program[j])) ++j;
-                std::string_view name = std::string_view{ program.data() + i, program.data() + j };
-                std::unique_ptr<Token> token;
-                if      (name == "extern") { token = Token::Create(TokenType::eExtern); }
-                else if (name == "return") { token = Token::Create(TokenType::eReturn); }
-                else                       { token = IdentifierToken::Create(std::string(name)); }
-                tokens.emplace_back(std::move(token));
+            if (std::isalpha(program_[i])) {
+                u64 j = i + 1; while (j < size && std::isalnum(program_[j])) ++j;
+                std::string_view name = std::string_view{ program_.data() + i, program_.data() + j };
+                Token* token;
+                if      (name == "extern") { token = new Token(TokenType::eExtern); }
+                else if (name == "return") { token = new Token(TokenType::eReturn); }
+                else                       { token = new IdentifierToken(std::string(name)); }
+                tokens_.emplace_back(token);
                 i = j; continue;
             }
 
             // number
-            if (std::isdigit(program[i])) {
+            if (std::isdigit(program_[i])) {
                 // TODO: handle multiple dots e.g. '123.123.123'
-                u64 j = i + 1; while (j < size && (std::isdigit(program[j]) || program[j] == '.')) ++j;
-                f64 value; std::from_chars(program.data() + i, program.data() + j, value);
-                tokens.emplace_back(NumberToken::Create(value));
+                u64 j = i + 1; while (j < size && (std::isdigit(program_[j]) || program_[j] == '.')) ++j;
+                f64 value; std::from_chars(program_.data() + i, program_.data() + j, value);
+                tokens_.emplace_back(new NumberToken(value));
                 i = j; continue;
             }
 
             // special
-            std::unique_ptr<Token> token;
-            if      (program[i] == ':') { token = Token::Create(TokenType::eColon); }
-            else if (program[i] == ';') { token = Token::Create(TokenType::eSemicolon); }
-            else if (program[i] == ',') { token = Token::Create(TokenType::eComma); }
-            else if (program[i] == '(') { token = Token::Create(TokenType::eLeftRoundBracket); }
-            else if (program[i] == ')') { token = Token::Create(TokenType::eRightRoundBracket); }
-            else if (program[i] == '{') { token = Token::Create(TokenType::eLeftCurlyBracket); }
-            else if (program[i] == '}') { token = Token::Create(TokenType::eRightCurlyBracket); }
-            else if (program[i] == '+') { token = Token::Create(TokenType::ePlus); }
-            else if (program[i] == '-') { token = Token::Create(TokenType::eMinus); }
-            else if (program[i] == '*') { token = Token::Create(TokenType::eAsterisk); }
-            else if (program[i] == '/') { token = Token::Create(TokenType::eSlash); }
-            else                        { token = Token::Create(TokenType::eUnknown); }
-            tokens.emplace_back(std::move(token));
+            Token* token;
+            if      (program_[i] == ':') { token = new Token(TokenType::eColon); }
+            else if (program_[i] == ';') { token = new Token(TokenType::eSemicolon); }
+            else if (program_[i] == ',') { token = new Token(TokenType::eComma); }
+            else if (program_[i] == '(') { token = new Token(TokenType::eLeftRoundBracket); }
+            else if (program_[i] == ')') { token = new Token(TokenType::eRightRoundBracket); }
+            else if (program_[i] == '{') { token = new Token(TokenType::eLeftCurlyBracket); }
+            else if (program_[i] == '}') { token = new Token(TokenType::eRightCurlyBracket); }
+            else if (program_[i] == '+') { token = new Token(TokenType::ePlus); }
+            else if (program_[i] == '-') { token = new Token(TokenType::eMinus); }
+            else if (program_[i] == '*') { token = new Token(TokenType::eAsterisk); }
+            else if (program_[i] == '/') { token = new Token(TokenType::eSlash); }
+            else                         { token = new Token(TokenType::eUnknown); }
+            tokens_.emplace_back(token);
 
             ++i;
         }
 
-        tokens.emplace_back(Token::Create(TokenType::eEof));
-
-        return tokens;
+        tokens_.emplace_back(new Token(TokenType::eEof));
     };
+
+    auto tokens() const -> std::vector<Token*> const& { return tokens_; }
+
+private:
+    std::string program_;
+    std::vector<Token*> tokens_;
 };

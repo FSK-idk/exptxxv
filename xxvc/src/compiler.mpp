@@ -16,11 +16,11 @@ public:
     Compiler(b8 printOpt = false) : printOpt_(printOpt) {}
 
     auto exec(std::string program, std::string const& outputFilename) -> bool {
-        Lexer lexer;
-        auto tokens = lexer.tokenize(program);
+        Lexer lexer(std::move(program));
+        lexer.tokenize();
 
-        Parser parser;
-        auto moduleNode = parser.parse(std::move(tokens));
+        Parser parser(lexer.tokens());
+        auto moduleNode = parser.parse();
 
         if (!moduleNode) {
             std::println("parse failed");

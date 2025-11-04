@@ -46,9 +46,12 @@ import nodes;
 //       ( primary-expression - empty-expression | binary-expression - empty-expression )
 // primary-expression
 //   ::= '(' expression ')'
+//   ::= function-call-expression
 //   ::= variable-expression
 //   ::= number-expression
 //   ::= empty-expression
+// function-call-expression
+//   ::= identifier ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
 // variable-expression
 //   ::= identifier
 // number-expression
@@ -266,9 +269,12 @@ private:
 
     // primary-expression
     //   ::= '(' expression ')'
+    //   ::= function-call-expression
     //   ::= variable-expression
     //   ::= number-expression
     //   ::= empty-expression
+    // function-call-expression
+    //   ::= identifier ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
     // variable-expression
     //   ::= identifier
     // number-expression
@@ -290,6 +296,46 @@ private:
         if (token()->type == TokenType::eIdentifier) {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
+            if (token()->type == TokenType::eLeftRoundBracket) {
+                advance();
+                std::vector<uptr_t<ExpressionNode>> args;
+                if (token()->type == TokenType::eRightRoundBracket) {
+                    advance();
+                }
+                else {
+                    auto expression = parseExpression();
+                    if (!expression) return nullptr;
+                    if (expression->type == ExpressionType::eEmptyExpression) {
+                        std::println("expected non-empty expression");
+                        return nullptr;
+                    }
+                    args.emplace_back(std::move(expression));
+                    while (true) {
+                        if (token()->type == TokenType::eRightRoundBracket) {
+                            advance();
+                            break;
+                        }
+                        if (token()->type != TokenType::eComma) {
+                            std::println("expected comma");
+                            return nullptr;
+                        }
+                        advance();
+                        if (token()->type == TokenType::eRightRoundBracket) {
+                            advance();
+                            break;
+                        }
+                        auto expression = parseExpression();
+                        if (!expression) return nullptr;
+                        if (expression->type == ExpressionType::eEmptyExpression) {
+                            std::println("expected non-empty expression");
+                            return nullptr;
+                        }
+                        args.emplace_back(std::move(expression));
+                    }
+                }
+                return uptr_cast<ExpressionNode>(
+                    FunctionCallExpressionNode::Create(std::move(identifier), std::move(args)));
+            }
             return uptr_cast<ExpressionNode>(
                 VariableExpressionNode::Create(std::move(identifier)));
         }

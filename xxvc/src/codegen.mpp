@@ -53,6 +53,9 @@ private:
         if (node->type == ExpressionType::eBinaryExpression) {
             return codegenBinaryExpression(static_cast<BinaryExpressionNode*>(node));
         }
+        else if (node->type == ExpressionType::eFunctionCallExpression) {
+            return codegenFunctionCallExpression(static_cast<FunctionCallExpressionNode*>(node));
+        }
         else if (node->type == ExpressionType::eVariableExpression) {
             return codegenVariableExpression(static_cast<VariableExpressionNode*>(node));
         }
@@ -79,6 +82,25 @@ private:
             return builder_->CreateFDiv(lhs, rhs, "divtmp");
         }
         return nullptr;
+    }
+
+    auto codegenFunctionCallExpression(FunctionCallExpressionNode* node) -> llvm::Value* {
+        if (!functions_.contains(node->identifier->name)) {
+            std::println("unknown function");
+            return nullptr;
+        }
+        llvm::Function* f = functions_[node->identifier->name];
+        if (node->args.size() != f->arg_size()) {
+            std::println("incorrect number of arguments");
+            return nullptr;
+        }
+        std::vector<llvm::Value*> argValues;
+        for (u32 i = 0, e = node->args.size(); i != e; ++i) {
+            auto arg = codegenExpression(node->args[i].get());
+            argValues.push_back(arg);
+            if (!argValues.back()) return nullptr;
+        }
+        return builder_->CreateCall(f, argValues, "calltmp");
     }
 
     auto codegenVariableExpression(VariableExpressionNode* node) -> llvm::Value* {
@@ -186,10 +208,12 @@ private:
         isMainFunction_ = node->prototype->identifier->name == "main";
         llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*context_, "entry", function);
         builder_->SetInsertPoint(entryBlock);
+        variables_.clear();
         for (auto& arg : function->args()) {
             llvm::IRBuilder<> builder(&function->getEntryBlock(), function->getEntryBlock().end());
             llvm::AllocaInst* argAlloca = builder.CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, arg.getName());
             builder_->CreateStore(&arg, argAlloca);
+            variables_[std::string(arg.getName())] = argAlloca;
         }
         for (auto& statement : node->body) {
             codegenFunctionStatement(statement.get());

@@ -16,6 +16,7 @@ enum class BinaryOperatorType {
 export
 enum class ExpressionType {
     eBinaryExpression,
+    eFunctionCallExpression,
     eVariableExpression,
     eNumberExpression,
     eEmptyExpression,
@@ -71,6 +72,13 @@ struct BinaryExpressionNode : ExpressionNode {
     uptr_t<BinaryOperatorNode> binaryOperator;
     uptr_t<ExpressionNode> lhs;
     uptr_t<ExpressionNode> rhs;
+};
+
+export
+struct FunctionCallExpressionNode : ExpressionNode {
+    static auto Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode>;
+    uptr_t<IdentifierNode> identifier;
+    std::vector<uptr_t<ExpressionNode>> args;
 };
 
 export

@@ -35,6 +35,8 @@ auto ExpressionNode::Destroy(ExpressionNode* node) -> void {
     switch (node->type) {
     case ExpressionType::eBinaryExpression:
         SelfDestructor<BinaryExpressionNode>{}(static_cast<BinaryExpressionNode*>(node)); break;
+    case ExpressionType::eFunctionCallExpression:
+        SelfDestructor<FunctionCallExpressionNode>{}(static_cast<FunctionCallExpressionNode*>(node)); break;
     case ExpressionType::eVariableExpression:
         SelfDestructor<VariableExpressionNode>{}(static_cast<VariableExpressionNode*>(node)); break;
     case ExpressionType::eNumberExpression:
@@ -51,6 +53,14 @@ auto ExpressionNode::Destroy(ExpressionNode* node) -> void {
 auto BinaryExpressionNode::Create(uptr_t<BinaryOperatorNode> binaryOperator, uptr_t<ExpressionNode> lhs, uptr_t<ExpressionNode> rhs) -> uptr_t<BinaryExpressionNode> {
     return uptr_t<BinaryExpressionNode>{
         new BinaryExpressionNode{ { {}, ExpressionType::eBinaryExpression }, std::move(binaryOperator), std::move(lhs), std::move(rhs) }
+    };
+}
+
+// FunctionCallExpressionNode
+
+auto FunctionCallExpressionNode::Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode> {
+    return uptr_t<FunctionCallExpressionNode>{
+        new FunctionCallExpressionNode{ { {}, ExpressionType::eFunctionCallExpression }, std::move(identifier), std::move(args) }
     };
 }
 

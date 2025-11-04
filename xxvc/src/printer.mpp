@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 export module printer;
 
 import std;
@@ -28,7 +32,7 @@ public:
         case ModuleStatementType::eExternFunctionDeclaration:
             print(static_cast<ExternFunctionDeclarationNode*>(node)); break;
         default:
-            indent(); std::println("UNKNOWN NODE"); break;
+            assert(false && "add case");
         }
     }
 
@@ -77,7 +81,7 @@ public:
         case FunctionStatementType::eReturnStatement:
             print(static_cast<ReturnStatementNode*>(node)); break;
         default:
-            indent(); std::println("UNKNOWN NODE"); break;
+            assert(false && "add case");
         }
     }
 
@@ -111,6 +115,8 @@ public:
         switch (node->type) {
         case ExpressionType::eBinaryExpression:
             print(static_cast<BinaryExpressionNode*>(node)); break;
+        case ExpressionType::eFunctionCallExpression:
+            print(static_cast<FunctionCallExpressionNode*>(node)); break;
         case ExpressionType::eVariableExpression:
             print(static_cast<VariableExpressionNode*>(node)); break;
         case ExpressionType::eNumberExpression:
@@ -118,7 +124,7 @@ public:
         case ExpressionType::eEmptyExpression:
             print(static_cast<EmptyExpressionNode*>(node)); break;
         default:
-            indent(); std::println("UNKNOWN NODE"); break;
+            assert(false && "add case");
         }
     }
 
@@ -131,6 +137,16 @@ public:
         print(node->lhs.get());
         indent(); std::println("-rhs");
         print(node->rhs.get());
+        retreat();
+    }
+
+    auto print(FunctionCallExpressionNode* node) -> void {
+        advance();
+        indent(); std::println("function-call-expression");
+        indent(); std::println("-identifier");
+        print(node->identifier.get());
+        indent(); std::println("-args");
+        for (auto& arg : node->args) print(arg.get());
         retreat();
     }
 
@@ -189,7 +205,7 @@ public:
         case BinaryOperatorType::eDivision:
             indent(); std::println("division"); break;
         default:
-            indent(); std::println("UNKNOWN TYPE"); break;
+            assert(false && "add case");
         }
         retreat();
         retreat();

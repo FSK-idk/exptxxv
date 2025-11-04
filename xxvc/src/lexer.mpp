@@ -11,19 +11,6 @@ class Lexer {
 public:
     Lexer(std::string program) : program_(std::move(program)) {}
 
-    ~Lexer() {
-        for (auto token : tokens_) {
-            switch (token->type()) {
-            case TokenType::eIdentifier:
-                delete static_cast<IdentifierToken*>(token); break;
-            case TokenType::eNumber:
-                delete static_cast<NumberToken*>(token); break;
-            default:
-                delete token; break;
-            }
-        }
-    }
-
     auto tokenize() -> void {
         u64 size = program_.size();
 
@@ -37,11 +24,11 @@ public:
             if (std::isalpha(program_[i])) {
                 u64 j = i + 1; while (j < size && std::isalnum(program_[j])) ++j;
                 std::string_view name = std::string_view{ program_.data() + i, program_.data() + j };
-                Token* token;
-                if      (name == "extern") { token = new Token(TokenType::eExtern); }
-                else if (name == "return") { token = new Token(TokenType::eReturn); }
-                else                       { token = new IdentifierToken(std::string(name)); }
-                tokens_.emplace_back(token);
+                uptr_t<Token> token;
+                if      (name == "extern") { token = Token::Create(TokenType::eExtern); }
+                else if (name == "return") { token = Token::Create(TokenType::eReturn); }
+                else                       { token = uptr_cast<Token>(IdentifierToken::Create(std::string(name))); }
+                tokens_.emplace_back(std::move(token));
                 i = j; continue;
             }
 
@@ -50,35 +37,35 @@ public:
                 // TODO: handle multiple dots e.g. '123.123.123'
                 u64 j = i + 1; while (j < size && (std::isdigit(program_[j]) || program_[j] == '.')) ++j;
                 f64 value; std::from_chars(program_.data() + i, program_.data() + j, value);
-                tokens_.emplace_back(new NumberToken(value));
+                tokens_.emplace_back(uptr_cast<Token>(NumberToken::Create(value)));
                 i = j; continue;
             }
 
             // special
-            Token* token;
-            if      (program_[i] == ':') { token = new Token(TokenType::eColon); }
-            else if (program_[i] == ';') { token = new Token(TokenType::eSemicolon); }
-            else if (program_[i] == ',') { token = new Token(TokenType::eComma); }
-            else if (program_[i] == '(') { token = new Token(TokenType::eLeftRoundBracket); }
-            else if (program_[i] == ')') { token = new Token(TokenType::eRightRoundBracket); }
-            else if (program_[i] == '{') { token = new Token(TokenType::eLeftCurlyBracket); }
-            else if (program_[i] == '}') { token = new Token(TokenType::eRightCurlyBracket); }
-            else if (program_[i] == '+') { token = new Token(TokenType::ePlus); }
-            else if (program_[i] == '-') { token = new Token(TokenType::eMinus); }
-            else if (program_[i] == '*') { token = new Token(TokenType::eAsterisk); }
-            else if (program_[i] == '/') { token = new Token(TokenType::eSlash); }
-            else                         { token = new Token(TokenType::eUnknown); }
-            tokens_.emplace_back(token);
+            uptr_t<Token> token;
+            if      (program_[i] == ':') { token = Token::Create(TokenType::eColon); }
+            else if (program_[i] == ';') { token = Token::Create(TokenType::eSemicolon); }
+            else if (program_[i] == ',') { token = Token::Create(TokenType::eComma); }
+            else if (program_[i] == '(') { token = Token::Create(TokenType::eLeftRoundBracket); }
+            else if (program_[i] == ')') { token = Token::Create(TokenType::eRightRoundBracket); }
+            else if (program_[i] == '{') { token = Token::Create(TokenType::eLeftCurlyBracket); }
+            else if (program_[i] == '}') { token = Token::Create(TokenType::eRightCurlyBracket); }
+            else if (program_[i] == '+') { token = Token::Create(TokenType::ePlus); }
+            else if (program_[i] == '-') { token = Token::Create(TokenType::eMinus); }
+            else if (program_[i] == '*') { token = Token::Create(TokenType::eAsterisk); }
+            else if (program_[i] == '/') { token = Token::Create(TokenType::eSlash); }
+            else                         { token = Token::Create(TokenType::eUnknown); }
+            tokens_.emplace_back(std::move(token));
 
             ++i;
         }
 
-        tokens_.emplace_back(new Token(TokenType::eEof));
+        tokens_.emplace_back(Token::Create(TokenType::eEof));
     };
 
-    auto tokens() const -> std::vector<Token*> const& { return tokens_; }
+    auto tokens() const -> std::vector<uptr_t<Token>> const& { return tokens_; }
 
 private:
     std::string program_;
-    std::vector<Token*> tokens_;
+    std::vector<uptr_t<Token>> tokens_;
 };

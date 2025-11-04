@@ -46,95 +46,95 @@ public:
 
 private:
     auto codegenNumber(NumberNode* node) -> llvm::ConstantFP* {
-        return llvm::ConstantFP::get(*context_, llvm::APFloat(node->value()));
+        return llvm::ConstantFP::get(*context_, llvm::APFloat(node->value));
     }
 
     auto codegenExpression(ExpressionNode* node) -> llvm::Value* {
-        if (node->type() == ExpressionType::eBinaryExpression) {
+        if (node->type == ExpressionType::eBinaryExpression) {
             return codegenBinaryExpression(static_cast<BinaryExpressionNode*>(node));
         }
-        else if (node->type() == ExpressionType::eVariableExpression) {
+        else if (node->type == ExpressionType::eVariableExpression) {
             return codegenVariableExpression(static_cast<VariableExpressionNode*>(node));
         }
-        else if (node->type() == ExpressionType::eNumberExpression) {
+        else if (node->type == ExpressionType::eNumberExpression) {
             return codegenNumberExpression(static_cast<NumberExpressionNode*>(node));
         }
         return nullptr;
     }
 
     auto codegenBinaryExpression(BinaryExpressionNode* node) -> llvm::Value* {
-        auto lhs = codegenExpression(node->lhs().get());
-        auto rhs = codegenExpression(node->rhs().get());
+        auto lhs = codegenExpression(node->lhs.get());
+        auto rhs = codegenExpression(node->rhs.get());
         if (!lhs || !rhs) return nullptr;
-        if (node->binaryOperator()->type() == BinaryOperatorType::eAddition) {
+        if (node->binaryOperator->type == BinaryOperatorType::eAddition) {
             return builder_->CreateFAdd(lhs, rhs, "addtmp");
         }
-        if (node->binaryOperator()->type() == BinaryOperatorType::eSubtraction) {
+        if (node->binaryOperator->type == BinaryOperatorType::eSubtraction) {
             return builder_->CreateFSub(lhs, rhs, "subtmp");
         }
-        if (node->binaryOperator()->type() == BinaryOperatorType::eMultiplication) {
+        if (node->binaryOperator->type == BinaryOperatorType::eMultiplication) {
             return builder_->CreateFMul(lhs, rhs, "multmp");
         }
-        if (node->binaryOperator()->type() == BinaryOperatorType::eDivision) {
+        if (node->binaryOperator->type == BinaryOperatorType::eDivision) {
             return builder_->CreateFDiv(lhs, rhs, "divtmp");
         }
         return nullptr;
     }
 
     auto codegenVariableExpression(VariableExpressionNode* node) -> llvm::Value* {
-        if (!variables_.contains(node->identifier()->name())) {
+        if (!variables_.contains(node->identifier->name)) {
             std::println("unknown variable name");
             return nullptr;
         }
-        llvm::AllocaInst* alloca = variables_[node->identifier()->name()];
-        return builder_->CreateLoad(alloca->getAllocatedType(), alloca, node->identifier()->name());
+        llvm::AllocaInst* alloca = variables_[node->identifier->name];
+        return builder_->CreateLoad(alloca->getAllocatedType(), alloca, node->identifier->name);
     }
 
     auto codegenNumberExpression(NumberExpressionNode* node) -> llvm::Value* {
-        return codegenNumber(node->number().get());
+        return codegenNumber(node->number.get());
     }
 
     auto codegenFunctionPrototype(FunctionPrototypeNode* node) -> llvm::Function* {
         // TODO: remove after types are introduced
-        if (node->identifier()->name() == "main") {
-        std::vector<llvm::Type*> args(node->args().size(), llvm::Type::getDoubleTy(*context_));
+        if (node->identifier->name == "main") {
+        std::vector<llvm::Type*> args(node->args.size(), llvm::Type::getDoubleTy(*context_));
             llvm::FunctionType* functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*context_), args, false);
-            llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, node->identifier()->name(), *module_);
-            u32 i = 0; for (auto& arg : function->args()) arg.setName(node->args()[i++]->name());
+            llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, node->identifier->name, *module_);
+            u32 i = 0; for (auto& arg : function->args()) arg.setName(node->args[i++]->name);
             return function;
         }
-        std::vector<llvm::Type*> args(node->args().size(), llvm::Type::getDoubleTy(*context_));
+        std::vector<llvm::Type*> args(node->args.size(), llvm::Type::getDoubleTy(*context_));
         llvm::FunctionType* functionType = llvm::FunctionType::get(llvm::Type::getDoubleTy(*context_), args, false);
-        llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, node->identifier()->name(), *module_);
-        u32 i = 0; for (auto& arg : function->args()) arg.setName(node->args()[i++]->name());
+        llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, node->identifier->name, *module_);
+        u32 i = 0; for (auto& arg : function->args()) arg.setName(node->args[i++]->name);
         return function;
     }
 
     auto codegenFunctionStatement(FunctionStatementNode* node) -> void {
-        if (node->type() == FunctionStatementType::eVariableDeclaration) {
+        if (node->type == FunctionStatementType::eVariableDeclaration) {
             codegenVariableDeclaration(static_cast<VariableDeclarationNode*>(node));
         }
-        else if (node->type() == FunctionStatementType::eVariableDefinition) {
+        else if (node->type == FunctionStatementType::eVariableDefinition) {
             codegenVariableDefinition(static_cast<VariableDefinitionNode*>(node));
         }
-        else if (node->type() == FunctionStatementType::eReturnStatement) {
+        else if (node->type == FunctionStatementType::eReturnStatement) {
             codegenReturnStatement(static_cast<ReturnStatementNode*>(node));
         }
     }
 
     auto codegenVariableDeclaration(VariableDeclarationNode* node) -> void {
-        auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->identifier()->name());
-        variables_[node->identifier()->name()] = alloca;
+        auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->identifier->name);
+        variables_[node->identifier->name] = alloca;
     }
 
     auto codegenVariableDefinition(VariableDefinitionNode* node) -> void {
-        if (!variables_.contains(node->identifier()->name())) {
-            auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->identifier()->name());
-            variables_[node->identifier()->name()] = alloca;
+        if (!variables_.contains(node->identifier->name)) {
+            auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->identifier->name);
+            variables_[node->identifier->name] = alloca;
         }
-        auto alloca = variables_[node->identifier()->name()];
-        if (node->expression()->type() != ExpressionType::eEmptyExpression) {
-            auto expression = codegenExpression(node->expression().get());
+        auto alloca = variables_[node->identifier->name];
+        if (node->expression->type != ExpressionType::eEmptyExpression) {
+            auto expression = codegenExpression(node->expression.get());
             builder_->CreateStore(expression, alloca);
         }
         else {
@@ -146,44 +146,44 @@ private:
     auto codegenReturnStatement(ReturnStatementNode* node) -> llvm::Value* {
         // TODO: remove after types are introduced
         if (isMainFunction_) {
-            auto expression = codegenExpression(node->expression().get());
+            auto expression = codegenExpression(node->expression.get());
             auto castedExpression = builder_->CreateCast(llvm::Instruction::CastOps::FPToSI, expression, llvm::Type::getInt32Ty(*context_));
             return builder_->CreateRet(castedExpression);
         }
-        auto expression = codegenExpression(node->expression().get());
+        auto expression = codegenExpression(node->expression.get());
         return builder_->CreateRet(expression);
     }
 
     auto codegenModuleStatement(ModuleStatementNode* node) -> void {
-        if      (node->type() == ModuleStatementType::eFunctionDeclaration) {
+        if      (node->type == ModuleStatementType::eFunctionDeclaration) {
             codegenFunctionDeclaration(static_cast<FunctionDeclarationNode*>(node));
         }
-        else if (node->type() == ModuleStatementType::eFunctionDefinition) {
+        else if (node->type == ModuleStatementType::eFunctionDefinition) {
             codegenFunctionDefinition(static_cast<FunctionDefinitionNode*>(node));
         }
-        else if (node->type() == ModuleStatementType::eExternFunctionDeclaration) {
+        else if (node->type == ModuleStatementType::eExternFunctionDeclaration) {
             codegenExternFunctionDeclaration(static_cast<ExternFunctionDeclarationNode*>(node));
         }
     }
 
     auto codegenFunctionDeclaration(FunctionDeclarationNode* node) -> void {
         // TODO: handle repeats
-        auto function = codegenFunctionPrototype(node->prototype().get());
-        functions_[node->prototype()->identifier()->name()] = function;
+        auto function = codegenFunctionPrototype(node->prototype.get());
+        functions_[node->prototype->identifier->name] = function;
     }
 
     auto codegenFunctionDefinition(FunctionDefinitionNode* node) -> void {
         // TODO: handle repeats
         llvm::Function* function;
-        if (functions_.contains(node->prototype()->identifier()->name())) {
+        if (functions_.contains(node->prototype->identifier->name)) {
             // TODO: check number of args in prototype
-            function = functions_[node->prototype()->identifier()->name()];
+            function = functions_[node->prototype->identifier->name];
         }
         else {
-            function = codegenFunctionPrototype(node->prototype().get());
-            functions_[node->prototype()->identifier()->name()] = function;
+            function = codegenFunctionPrototype(node->prototype.get());
+            functions_[node->prototype->identifier->name] = function;
         }
-        isMainFunction_ = node->prototype()->identifier()->name() == "main";
+        isMainFunction_ = node->prototype->identifier->name == "main";
         llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*context_, "entry", function);
         builder_->SetInsertPoint(entryBlock);
         for (auto& arg : function->args()) {
@@ -191,7 +191,7 @@ private:
             llvm::AllocaInst* argAlloca = builder.CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, arg.getName());
             builder_->CreateStore(&arg, argAlloca);
         }
-        for (auto& statement : node->body()) {
+        for (auto& statement : node->body) {
             codegenFunctionStatement(statement.get());
         }
     }
@@ -199,18 +199,18 @@ private:
     auto codegenExternFunctionDeclaration(ExternFunctionDeclarationNode* node) -> void {
         // TODO: handle repeats
         llvm::Function* prototype;
-        if (functions_.contains(node->prototype()->identifier()->name())) {
+        if (functions_.contains(node->prototype->identifier->name)) {
             // TODO: check number of args in prototype
-            prototype = functions_[node->prototype()->identifier()->name()];
+            prototype = functions_[node->prototype->identifier->name];
         }
         else {
-            prototype = codegenFunctionPrototype(node->prototype().get());
-            functions_[node->prototype()->identifier()->name()] = prototype;
+            prototype = codegenFunctionPrototype(node->prototype.get());
+            functions_[node->prototype->identifier->name] = prototype;
         }
     }
 
     auto codegenModule(ModuleNode* node) -> void {
-        for (auto& statement : node->body()) {
+        for (auto& statement : node->body) {
             codegenModuleStatement(statement.get());
         }
     }

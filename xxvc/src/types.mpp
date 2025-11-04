@@ -13,3 +13,40 @@ using u32 = std::uint32_t;
 using b8 = bool;
 
 }
+
+export {
+
+template <class T>
+struct enable_self_destroy : std::false_type {};
+
+template <class T>
+concept SelfDestructable =
+    requires (T* node) {
+        { T::Destroy(node) } -> std::same_as<void>;
+        requires enable_self_destroy<T>::value;
+    };
+
+template <class T>
+struct SelfDestructor;
+
+template <class T>
+requires SelfDestructable<T>
+struct SelfDestructor<T> {
+    auto operator() (T* node) -> void {
+        T::Destroy(node);
+    }
+};
+
+template <class T>
+requires (!SelfDestructable<T>)
+struct SelfDestructor<T> : std::default_delete<T> {};
+
+template <class T>
+using uptr_t = std::unique_ptr<T, SelfDestructor<T>>;
+
+template<class T, class Ptr>
+auto uptr_cast(Ptr&& ptr) -> uptr_t<T> {
+    return uptr_t<T>{ static_cast<T*>(ptr.release()) };
+}
+
+}

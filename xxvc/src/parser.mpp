@@ -67,30 +67,24 @@ import nodes;
 export
 class Parser {
 public:
-    Parser(std::vector<Token*> const& tokens) : tokens_(tokens) {}
+    Parser(std::vector<uptr_t<Token>> const& tokens)
+        : tokens_(tokens), moduleNode_(nullptr) {}
 
-    auto parse() -> std::unique_ptr<ModuleNode> {
+    auto parse() -> void {
         tokenIndex_ = 0;
-        auto moduleNode = parseModule();
-        return moduleNode;
+        moduleNode_ = parseModule();
     }
+
+    auto moduleNode() const -> uptr_t<ModuleNode> const& { return moduleNode_; }
 
 private:
-    auto token() -> Token* {
-        return tokens_[tokenIndex_];
-    }
-
-    auto advanceToken() -> void {
-        ++tokenIndex_;
-    }
-
     // module
     //   ::= module-statement*
-    auto parseModule() -> std::unique_ptr<ModuleNode> {
-        std::vector<std::unique_ptr<ModuleStatementNode>> body;
+    auto parseModule() -> uptr_t<ModuleNode> {
+        std::vector<uptr_t<ModuleStatementNode>> body;
         while (true) {
-            if (token()->type() == TokenType::eEof) {
-                advanceToken();
+            if (token()->type == TokenType::eEof) {
+                advance();
                 break;
             }
             auto statement = parseModuleStatement();
@@ -110,81 +104,84 @@ private:
     //   ::= function-prototype '{' function-statement* '}' ';'
     // extern-function-declaration
     //   ::= 'extern' function-prototype ';'
-    auto parseModuleStatement() -> std::unique_ptr<ModuleStatementNode> {
+    auto parseModuleStatement() -> uptr_t<ModuleStatementNode> {
         b8 isExtern = false;
-        if (token()->type() == TokenType::eExtern) {
+        if (token()->type == TokenType::eExtern) {
             isExtern = true;
-            advanceToken();
+            advance();
         }
         auto prototype = parseFunctionPrototype();
         if (!prototype) return nullptr;
-        if (token()->type() == TokenType::eSemicolon) {
-            advanceToken();
+        if (token()->type == TokenType::eSemicolon) {
+            advance();
             if (isExtern) {
-                return ExternFunctionDeclarationNode::Create(std::move(prototype));
+                return uptr_cast<ModuleStatementNode>(
+                    ExternFunctionDeclarationNode::Create(std::move(prototype)));
             }
             else {
-                return FunctionDeclarationNode::Create(std::move(prototype));
+                return uptr_cast<ModuleStatementNode>(
+                    FunctionDeclarationNode::Create(std::move(prototype)));
             }
         }
-        if (token()->type() != TokenType::eLeftCurlyBracket) {
+        if (token()->type != TokenType::eLeftCurlyBracket) {
             std::println("expected left curly bracket");
             return nullptr;
         }
-        advanceToken();
-        std::vector<std::unique_ptr<FunctionStatementNode>> body;
+        advance();
+        std::vector<uptr_t<FunctionStatementNode>> body;
         while (true) {
-            if (token()->type() == TokenType::eRightCurlyBracket) {
-                advanceToken();
+            if (token()->type == TokenType::eRightCurlyBracket) {
+                advance();
                 break;
             }
             auto statement = parseFunctionStatement();
             if (!statement) return nullptr;
             body.emplace_back(std::move(statement));
         }
-        if (token()->type() != TokenType::eSemicolon) {
+        if (token()->type != TokenType::eSemicolon) {
             std::println("expected semicolon");
             return nullptr;
         }
-        advanceToken();
-        return FunctionDefinitionNode::Create(std::move(prototype), std::move(body));
+        advance();
+        return uptr_cast<ModuleStatementNode>(
+            FunctionDefinitionNode::Create(std::move(prototype), std::move(body)));
     }
 
     // function-prototype
     //   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
-    auto parseFunctionPrototype() -> std::unique_ptr<FunctionPrototypeNode> {
+    auto parseFunctionPrototype() -> uptr_t<FunctionPrototypeNode> {
         auto identifier = parseIdentifier();
         if (!identifier) return nullptr;
-        if (token()->type() != TokenType::eColon) {
+        if (token()->type != TokenType::eColon) {
             std::println("expected colon");
             return nullptr;
         }
-        advanceToken();
-        if (token()->type() != TokenType::eLeftRoundBracket) {
+        advance();
+        if (token()->type != TokenType::eLeftRoundBracket) {
             std::println("expected left round bracket");
             return nullptr;
         }
-        advanceToken();
-        std::vector<std::unique_ptr<IdentifierNode>> args;
-        if (token()->type() == TokenType::eRightRoundBracket) {
-            advanceToken();
+        advance();
+        std::vector<uptr_t<IdentifierNode>> args;
+        if (token()->type == TokenType::eRightRoundBracket) {
+            advance();
         }
         else {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
             args.emplace_back(std::move(identifier));
             while (true) {
-                if (token()->type() == TokenType::eRightRoundBracket) {
-                    advanceToken();
+                if (token()->type == TokenType::eRightRoundBracket) {
+                    advance();
                     break;
                 }
-                if (token()->type() != TokenType::eComma) {
+                if (token()->type != TokenType::eComma) {
                     std::println("expected comma");
                     return nullptr;
                 }
-                advanceToken();
-                if (token()->type() == TokenType::eRightRoundBracket) {
-                    advanceToken();
+                advance();
+                if (token()->type == TokenType::eRightRoundBracket) {
+                    advance();
                     break;
                 }
                 auto identifier = parseIdentifier();
@@ -205,60 +202,63 @@ private:
     //   ::= identifier ':' '{' expression '}' ';'
     // return-statement
     //   ::= 'return' expression ';'
-    auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
-        if (token()->type() == TokenType::eIdentifier) {
+    auto parseFunctionStatement() -> uptr_t<FunctionStatementNode> {
+        if (token()->type == TokenType::eIdentifier) {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
-            if (token()->type() == TokenType::eSemicolon) {
-                advanceToken();
-                return VariableDeclarationNode::Create(std::move(identifier));
+            if (token()->type == TokenType::eSemicolon) {
+                advance();
+                return uptr_cast<FunctionStatementNode>(
+                    VariableDeclarationNode::Create(std::move(identifier)));
             }
-            if (token()->type() != TokenType::eColon) {
+            if (token()->type != TokenType::eColon) {
                 std::println("exprected colon");
                 return nullptr;
             }
-            advanceToken();
-            if (token()->type() != TokenType::eLeftCurlyBracket) {
+            advance();
+            if (token()->type != TokenType::eLeftCurlyBracket) {
                 std::println("exprected left curly bracket");
                 return nullptr;
             }
-            advanceToken();
+            advance();
             auto expression = parseExpression();
             if (!expression) return nullptr;
-            if (token()->type() != TokenType::eRightCurlyBracket) {
+            if (token()->type != TokenType::eRightCurlyBracket) {
                 std::println("exprected right curly bracket");
                 return nullptr;
             }
-            advanceToken();
-            if (token()->type() != TokenType::eSemicolon) {
+            advance();
+            if (token()->type != TokenType::eSemicolon) {
                 std::println("exprected semicolon");
                 return nullptr;
             }
-            advanceToken();
-            return VariableDefinitionNode::Create(std::move(identifier), std::move(expression));
+            advance();
+            return uptr_cast<FunctionStatementNode>(
+                VariableDefinitionNode::Create(std::move(identifier), std::move(expression)));
         }
-        else if (token()->type() == TokenType::eReturn) {
-            advanceToken();
+        else if (token()->type == TokenType::eReturn) {
+            advance();
             auto expression = parseExpression();
             if (!expression) return nullptr;
-            if (token()->type() != TokenType::eSemicolon) {
+            if (token()->type != TokenType::eSemicolon) {
                 std::println("expected semicolon");
                 return nullptr;
             }
-            advanceToken();
-            return ReturnStatementNode::Create(std::move(expression));
+            advance();
+            return uptr_cast<FunctionStatementNode>(
+                ReturnStatementNode::Create(std::move(expression)));
         }
         std::println("expected function statement");
         return nullptr;
     };
 
     // expression
-    //   ::= primary-expression
     //   ::= binary-expression
-    auto parseExpression() -> std::unique_ptr<ExpressionNode> {
+    //   ::= primary-expression
+    auto parseExpression() -> uptr_t<ExpressionNode> {
         auto expression = parsePrimaryExpression();
         if (!expression) return nullptr;
-        if (expression->type() == ExpressionType::eEmptyExpression) return expression;
+        if (expression->type == ExpressionType::eEmptyExpression) return expression;
         expression = parseBinaryExpressionRhs(0, std::move(expression));
         if (!expression) return nullptr;
         return expression;
@@ -275,36 +275,39 @@ private:
     //   ::= number
     // empty-expression
     //   ::=
-    auto parsePrimaryExpression() -> std::unique_ptr<ExpressionNode> {
-        if (token()->type() == TokenType::eLeftRoundBracket) {
-            advanceToken();
+    auto parsePrimaryExpression() -> uptr_t<ExpressionNode> {
+        if (token()->type == TokenType::eLeftRoundBracket) {
+            advance();
             auto expression = parseExpression();
             if (!expression) return nullptr;
-            if (token()->type() != TokenType::eRightRoundBracket) {
+            if (token()->type != TokenType::eRightRoundBracket) {
                 std::println("expected right round bracket");
                 return nullptr;
             }
-            advanceToken();
+            advance();
             return expression;
         }
-        if (token()->type() == TokenType::eIdentifier) {
+        if (token()->type == TokenType::eIdentifier) {
             auto identifier = parseIdentifier();
             if (!identifier) return nullptr;
-            return VariableExpressionNode::Create(std::move(identifier));
+            return uptr_cast<ExpressionNode>(
+                VariableExpressionNode::Create(std::move(identifier)));
         }
-        if (token()->type() == TokenType::eNumber) {
+        if (token()->type == TokenType::eNumber) {
             auto number = parseNumber();
             if (!number) return nullptr;
-            return NumberExpressionNode::Create(std::move(number));
+            return uptr_cast<ExpressionNode>(
+                NumberExpressionNode::Create(std::move(number)));
         }
-        return EmptyExpressionNode::Create();
+        return uptr_cast<ExpressionNode>(
+            EmptyExpressionNode::Create());
     }
 
     // binary-expression
     //   ::= ( primary-expression - empty-expression | binary-expression - empty-expression )
     //       binary-operator
     //       ( primary-expression - empty-expression | binary-expression - empty-expression )
-    auto parseBinaryExpressionRhs(u64 currentPrecedence, std::unique_ptr<ExpressionNode> lhs) -> std::unique_ptr<ExpressionNode> {
+    auto parseBinaryExpressionRhs(u64 currentPrecedence, uptr_t<ExpressionNode> lhs) -> uptr_t<ExpressionNode> {
         static std::map<BinaryOperatorType, i32> precedence = {
             { BinaryOperatorType::eAddition,       1 },
             { BinaryOperatorType::eSubtraction,    1 },
@@ -315,64 +318,73 @@ private:
         while (true) {
             auto binaryOperator = peekBinaryOperator();
             if (!binaryOperator) return lhs;
-            if (currentPrecedence > precedence[binaryOperator->type()]) return lhs;
-            advanceToken();
+            if (currentPrecedence > precedence[binaryOperator->type]) return lhs;
+            advance();
             auto rhs = parsePrimaryExpression();
             if (!rhs) return nullptr;
-            if (rhs->type() == ExpressionType::eEmptyExpression) {
+            if (rhs->type == ExpressionType::eEmptyExpression) {
                 std::println("expected non-empty expression");
                 return nullptr;
             }
             auto nextBinaryOperator = peekBinaryOperator();
-            if (nextBinaryOperator && precedence[binaryOperator->type()] < precedence[nextBinaryOperator->type()]) {
-                rhs = parseBinaryExpressionRhs(precedence[nextBinaryOperator->type()], std::move(rhs));
+            if (nextBinaryOperator && precedence[binaryOperator->type] < precedence[nextBinaryOperator->type]) {
+                rhs = parseBinaryExpressionRhs(precedence[nextBinaryOperator->type], std::move(rhs));
                 if (!rhs) return nullptr;
-                if (rhs->type() == ExpressionType::eEmptyExpression) {
+                if (rhs->type == ExpressionType::eEmptyExpression) {
                     std::println("expected non-empty expression");
                     return nullptr;
                 }
             }
-            lhs = BinaryExpressionNode::Create(std::move(binaryOperator), std::move(lhs), std::move(rhs));
+            lhs = uptr_cast<ExpressionNode>(
+                BinaryExpressionNode::Create(std::move(binaryOperator), std::move(lhs), std::move(rhs)));
         }
     }
 
     // identifier
     //   ::= identifier-token
-    auto parseIdentifier() -> std::unique_ptr<IdentifierNode> {
-        if (token()->type() != TokenType::eIdentifier) {
+    auto parseIdentifier() -> uptr_t<IdentifierNode> {
+        if (token()->type != TokenType::eIdentifier) {
             std::println("expected identifier");
             return nullptr;
         }
         auto identifier = static_cast<IdentifierToken*>(token());
-        advanceToken();
-        return IdentifierNode::Create(identifier->name());
+        advance();
+        return IdentifierNode::Create(identifier->name);
     }
 
     // number
     //   ::= number-token
-    auto parseNumber() -> std::unique_ptr<NumberNode> {
-        if (token()->type() != TokenType::eNumber) {
+    auto parseNumber() -> uptr_t<NumberNode> {
+        if (token()->type != TokenType::eNumber) {
             std::println("expected number");
             return nullptr;
         }
         auto number = static_cast<NumberToken*>(token());
-        advanceToken();
-        return NumberNode::Create(number->value());
+        advance();
+        return NumberNode::Create(number->value);
     }
 
     // binary-operator
     //   ::= '+' | '-' | '*' | '/'
-    auto peekBinaryOperator() -> std::unique_ptr<BinaryOperatorNode> {
+    auto peekBinaryOperator() -> uptr_t<BinaryOperatorNode> {
         BinaryOperatorType type;
-        if      (token()->type() == TokenType::ePlus)     { type = BinaryOperatorType::eAddition; }
-        else if (token()->type() == TokenType::eMinus)    { type = BinaryOperatorType::eSubtraction; }
-        else if (token()->type() == TokenType::eAsterisk) { type = BinaryOperatorType::eMultiplication; }
-        else if (token()->type() == TokenType::eSlash)    { type = BinaryOperatorType::eDivision; }
-        else                                              { return nullptr; }
+        switch (token()->type) {
+            case TokenType::ePlus:     type = BinaryOperatorType::eAddition; break;
+            case TokenType::eMinus:    type = BinaryOperatorType::eSubtraction; break;
+            case TokenType::eAsterisk: type = BinaryOperatorType::eMultiplication; break;
+            case TokenType::eSlash:    type = BinaryOperatorType::eDivision; break;
+            default:
+                return nullptr;
+        }
         return BinaryOperatorNode::Create(type);
     }
 
 private:
-    std::vector<Token*> const& tokens_;
+    auto token() -> Token* { return tokens_[tokenIndex_].get(); }
+    auto advance() -> void { ++tokenIndex_; }
+
+private:
+    std::vector<uptr_t<Token>> const& tokens_;
     u64 tokenIndex_;
+    uptr_t<ModuleNode> moduleNode_;
 };

@@ -20,20 +20,20 @@ public:
         lexer.tokenize();
 
         Parser parser(lexer.tokens());
-        auto moduleNode = parser.parse();
+        parser.parse();
 
-        if (!moduleNode) {
+        if (!parser.moduleNode()) {
             std::println("parse failed");
             return false;
         }
         else {
             Printer printer;
             std::println("{:=<40}", "= ast =");
-            printer.print(*moduleNode);
+            printer.print(parser.moduleNode().get());
         }
 
         Codegen codegen;
-        auto output = codegen.codegen(moduleNode.get());
+        auto output = codegen.codegen(parser.moduleNode().get());
 
         if (printOpt_) {
             std::println("{:=<40}", "= input =");

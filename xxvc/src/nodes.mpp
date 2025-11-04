@@ -36,265 +36,125 @@ enum class ModuleStatementType {
 };
 
 export
-class Node {
-public:
-private:
+struct Node {};
+
+export
+struct IdentifierNode : Node {
+    static auto Create(std::string name) -> uptr_t<IdentifierNode>;
+    std::string name;
 };
 
 export
-class IdentifierNode : public Node {
-public:
-    static auto Create(std::string name) -> std::unique_ptr<IdentifierNode> {
-        return std::make_unique<IdentifierNode>(std::move(name));
-    }
-    IdentifierNode(std::string name) : name_(std::move(name)) {}
-    auto name() const -> std::string const& { return name_; }
-private:
-    std::string name_;
+struct NumberNode : Node {
+    static auto Create(f64 value) -> uptr_t<NumberNode>;
+    f64 value;
 };
 
 export
-class NumberNode : public Node {
-public:
-    static auto Create(f64 number) -> std::unique_ptr<NumberNode> {
-        return std::make_unique<NumberNode>(number);
-    }
-    NumberNode(f64 number) : value_(number) {}
-    auto value() const -> f64 { return value_; }
-private:
-    f64 value_;
+struct BinaryOperatorNode : Node {
+    static auto Create(BinaryOperatorType type) -> uptr_t<BinaryOperatorNode>;
+    BinaryOperatorType type;
 };
 
 export
-class BinaryOperatorNode : public Node {
-public:
-    static auto Create(BinaryOperatorType type) -> std::unique_ptr<BinaryOperatorNode> {
-        return std::make_unique<BinaryOperatorNode>(type);
-    }
-    BinaryOperatorNode(BinaryOperatorType type) : type_(type) {}
-    auto type() const -> BinaryOperatorType { return type_; }
-private:
-    BinaryOperatorType type_;
+struct ExpressionNode : Node {
+    static auto Destroy(ExpressionNode* node) -> void;
+    ExpressionType type;
+};
+
+template <>
+struct enable_self_destroy<ExpressionNode> : std::true_type {};
+
+export
+struct BinaryExpressionNode : ExpressionNode {
+    static auto Create(uptr_t<BinaryOperatorNode> binaryOperator, uptr_t<ExpressionNode> lhs, uptr_t<ExpressionNode> rhs) -> uptr_t<BinaryExpressionNode>;
+    uptr_t<BinaryOperatorNode> binaryOperator;
+    uptr_t<ExpressionNode> lhs;
+    uptr_t<ExpressionNode> rhs;
 };
 
 export
-class ExpressionNode : public Node {
-public:
-    auto type() const -> ExpressionType { return type_; }
-protected:
-    ExpressionNode(ExpressionType type) : type_(type) {}
-    ExpressionType type_;
+struct VariableExpressionNode : ExpressionNode {
+    static auto Create(uptr_t<IdentifierNode> identifier) -> uptr_t<VariableExpressionNode>;
+    uptr_t<IdentifierNode> identifier;
 };
 
 export
-class BinaryExpressionNode : public ExpressionNode {
-public:
-    static auto Create(
-        std::unique_ptr<BinaryOperatorNode> binaryOperator,
-        std::unique_ptr<ExpressionNode> lhs,
-        std::unique_ptr<ExpressionNode> rhs) -> std::unique_ptr<BinaryExpressionNode> {
-        return std::make_unique<BinaryExpressionNode>(std::move(binaryOperator), std::move(lhs), std::move(rhs));
-    }
-    BinaryExpressionNode(
-        std::unique_ptr<BinaryOperatorNode> binaryOperator,
-        std::unique_ptr<ExpressionNode> lhs,
-        std::unique_ptr<ExpressionNode> rhs)
-        : ExpressionNode(ExpressionType::eBinaryExpression)
-        , binaryOperator_(std::move(binaryOperator))
-        , lhs_(std::move(lhs))
-        , rhs_(std::move(rhs)) {}
-    auto binaryOperator() const -> std::unique_ptr<BinaryOperatorNode> const& { return binaryOperator_; }
-    auto lhs() const -> std::unique_ptr<ExpressionNode> const& { return lhs_; }
-    auto rhs() const -> std::unique_ptr<ExpressionNode> const& { return rhs_; }
-private:
-    std::unique_ptr<BinaryOperatorNode> binaryOperator_;
-    std::unique_ptr<ExpressionNode> lhs_;
-    std::unique_ptr<ExpressionNode> rhs_;
+struct NumberExpressionNode : ExpressionNode {
+    static auto Create(uptr_t<NumberNode> number) -> uptr_t<NumberExpressionNode>;
+    uptr_t<NumberNode> number;
 };
 
 export
-class VariableExpressionNode : public ExpressionNode {
-public:
-    static auto Create(std::unique_ptr<IdentifierNode> identifier) -> std::unique_ptr<VariableExpressionNode> {
-        return std::make_unique<VariableExpressionNode>(std::move(identifier));
-    }
-    VariableExpressionNode(std::unique_ptr<IdentifierNode> identifier)
-        : ExpressionNode(ExpressionType::eVariableExpression)
-        , identifier_(std::move(identifier)) {}
-    auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
-private:
-    std::unique_ptr<IdentifierNode> identifier_;
+struct EmptyExpressionNode : ExpressionNode {
+    static auto Create() -> uptr_t<EmptyExpressionNode>;
 };
 
 export
-class NumberExpressionNode : public ExpressionNode {
-public:
-    static auto Create(std::unique_ptr<NumberNode> number) -> std::unique_ptr<NumberExpressionNode> {
-        return std::make_unique<NumberExpressionNode>(std::move(number));
-    }
-    NumberExpressionNode(std::unique_ptr<NumberNode> number)
-        : ExpressionNode(ExpressionType::eNumberExpression)
-        , number_(std::move(number)) {}
-    auto number() const -> std::unique_ptr<NumberNode> const& { return number_; }
-private:
-    std::unique_ptr<NumberNode> number_;
+struct FunctionStatementNode : Node {
+    static auto Destroy(FunctionStatementNode* node) -> void;
+    FunctionStatementType type;
+};
+
+template <>
+struct enable_self_destroy<FunctionStatementNode> : std::true_type {};
+
+export
+struct VariableDeclarationNode : FunctionStatementNode {
+    static auto Create(uptr_t<IdentifierNode> identifier) -> uptr_t<VariableDeclarationNode>;
+    uptr_t<IdentifierNode> identifier;
 };
 
 export
-class EmptyExpressionNode : public ExpressionNode {
-public:
-    static auto Create() -> std::unique_ptr<EmptyExpressionNode> {
-        return std::make_unique<EmptyExpressionNode>();
-    }
-    EmptyExpressionNode() : ExpressionNode(ExpressionType::eEmptyExpression) {}
+struct VariableDefinitionNode : FunctionStatementNode {
+    static auto Create(uptr_t<IdentifierNode> identifier, uptr_t<ExpressionNode> expression) -> uptr_t<VariableDefinitionNode>;
+    uptr_t<IdentifierNode> identifier;
+    uptr_t<ExpressionNode> expression;
 };
 
 export
-class FunctionStatementNode : public Node {
-public:
-    auto type() const -> FunctionStatementType { return type_; }
-protected:
-    FunctionStatementNode(FunctionStatementType type) : type_(type) {}
-    FunctionStatementType type_;
+struct ReturnStatementNode : FunctionStatementNode {
+    static auto Create(uptr_t<ExpressionNode> expression) -> uptr_t<ReturnStatementNode>;
+    uptr_t<ExpressionNode> expression;
 };
 
 export
-class VariableDeclarationNode : public FunctionStatementNode {
-public:
-    static auto Create(std::unique_ptr<IdentifierNode> identifier) -> std::unique_ptr<VariableDeclarationNode> {
-        return std::make_unique<VariableDeclarationNode>(std::move(identifier));
-    }
-    VariableDeclarationNode(std::unique_ptr<IdentifierNode> identifier)
-        : FunctionStatementNode(FunctionStatementType::eVariableDeclaration)
-        , identifier_(std::move(identifier)) {}
-    auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
-private:
-    std::unique_ptr<IdentifierNode> identifier_;
+struct FunctionPrototypeNode : Node {
+    static auto Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<IdentifierNode>> args) -> uptr_t<FunctionPrototypeNode>;
+    uptr_t<IdentifierNode> identifier;
+    std::vector<uptr_t<IdentifierNode>> args;
 };
 
 export
-class VariableDefinitionNode : public FunctionStatementNode {
-public:
-    static auto Create(
-        std::unique_ptr<IdentifierNode> identifier,
-        std::unique_ptr<ExpressionNode> expression) -> std::unique_ptr<VariableDefinitionNode> {
-        return std::make_unique<VariableDefinitionNode>(std::move(identifier), std::move(expression));
-    }
-    VariableDefinitionNode(
-        std::unique_ptr<IdentifierNode> identifier,
-        std::unique_ptr<ExpressionNode> expression)
-        : FunctionStatementNode(FunctionStatementType::eVariableDefinition)
-        , identifier_(std::move(identifier))
-        , expression_(std::move(expression)) {}
-    auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
-    auto expression() const -> std::unique_ptr<ExpressionNode> const& { return expression_; }
-private:
-    std::unique_ptr<IdentifierNode> identifier_;
-    std::unique_ptr<ExpressionNode> expression_;
+struct ModuleStatementNode : Node {
+    static auto Destroy(ModuleStatementNode* node) -> void;
+    ModuleStatementType type;
+};
+
+template <>
+struct enable_self_destroy<ModuleStatementNode> : std::true_type {};
+
+export
+struct FunctionDeclarationNode : ModuleStatementNode {
+    static auto Create(uptr_t<FunctionPrototypeNode> prototype) -> uptr_t<FunctionDeclarationNode>;
+    uptr_t<FunctionPrototypeNode> prototype;
 };
 
 export
-class ReturnStatementNode : public FunctionStatementNode {
-public:
-    static auto Create(std::unique_ptr<ExpressionNode> expression) -> std::unique_ptr<ReturnStatementNode> {
-        return std::make_unique<ReturnStatementNode>(std::move(expression));
-    }
-    ReturnStatementNode(std::unique_ptr<ExpressionNode> expression)
-        : FunctionStatementNode(FunctionStatementType::eReturnStatement)
-        , expression_(std::move(expression)) {}
-    auto expression() const -> std::unique_ptr<ExpressionNode> const& { return expression_; }
-private:
-    std::unique_ptr<ExpressionNode> expression_;
+struct FunctionDefinitionNode : ModuleStatementNode {
+    static auto Create(uptr_t<FunctionPrototypeNode> prototype, std::vector<uptr_t<FunctionStatementNode>> body) -> uptr_t<FunctionDefinitionNode>;
+    uptr_t<FunctionPrototypeNode> prototype;
+    std::vector<uptr_t<FunctionStatementNode>> body;
 };
 
 export
-class FunctionPrototypeNode : public Node {
-public:
-    static auto Create(
-        std::unique_ptr<IdentifierNode> identifier,
-        std::vector<std::unique_ptr<IdentifierNode>> args) -> std::unique_ptr<FunctionPrototypeNode> {
-        return std::make_unique<FunctionPrototypeNode>(std::move(identifier), std::move(args));
-    }
-    FunctionPrototypeNode(
-        std::unique_ptr<IdentifierNode> identifier,
-        std::vector<std::unique_ptr<IdentifierNode>> args)
-        : identifier_(std::move(identifier))
-        , args_(std::move(args)) {}
-    auto identifier() const -> std::unique_ptr<IdentifierNode> const& { return identifier_; }
-    auto args() const -> std::vector<std::unique_ptr<IdentifierNode>> const& { return args_; }
-protected:
-    std::unique_ptr<IdentifierNode> identifier_;
-    std::vector<std::unique_ptr<IdentifierNode>> args_;
+struct ExternFunctionDeclarationNode : ModuleStatementNode {
+    static auto Create(uptr_t<FunctionPrototypeNode> prototype) -> uptr_t<ExternFunctionDeclarationNode>;
+    uptr_t<FunctionPrototypeNode> prototype;
 };
 
 export
-class ModuleStatementNode : public Node {
-public:
-    auto type() const -> ModuleStatementType { return type_; }
-protected:
-    ModuleStatementNode(ModuleStatementType type) : type_(type) {}
-    ModuleStatementType type_;
-};
-
-export
-class FunctionDeclarationNode : public ModuleStatementNode {
-public:
-    static auto Create(std::unique_ptr<FunctionPrototypeNode> prototype) -> std::unique_ptr<FunctionDeclarationNode> {
-        return std::make_unique<FunctionDeclarationNode>(std::move(prototype));
-    }
-    FunctionDeclarationNode(
-        std::unique_ptr<FunctionPrototypeNode> prototype)
-        : ModuleStatementNode(ModuleStatementType::eFunctionDeclaration)
-        , prototype_(std::move(prototype)) {}
-    auto prototype() const -> std::unique_ptr<FunctionPrototypeNode> const& { return prototype_; }
-private:
-    std::unique_ptr<FunctionPrototypeNode> prototype_;
-};
-
-export
-class FunctionDefinitionNode : public ModuleStatementNode {
-public:
-    static auto Create(
-        std::unique_ptr<FunctionPrototypeNode> prototype,
-        std::vector<std::unique_ptr<FunctionStatementNode>> body) -> std::unique_ptr<FunctionDefinitionNode> {
-        return std::make_unique<FunctionDefinitionNode>(std::move(prototype), std::move(body));
-    }
-    FunctionDefinitionNode(
-        std::unique_ptr<FunctionPrototypeNode> prototype,
-        std::vector<std::unique_ptr<FunctionStatementNode>> body)
-        : ModuleStatementNode(ModuleStatementType::eFunctionDefinition)
-        , prototype_(std::move(prototype))
-        , body_(std::move(body)) {}
-    auto prototype() const -> std::unique_ptr<FunctionPrototypeNode> const& { return prototype_; }
-    auto body() const -> std::vector<std::unique_ptr<FunctionStatementNode>> const& { return body_; }
-private:
-    std::unique_ptr<FunctionPrototypeNode> prototype_;
-    std::vector<std::unique_ptr<FunctionStatementNode>> body_;
-};
-
-export
-class ExternFunctionDeclarationNode : public ModuleStatementNode {
-public:
-    static auto Create(std::unique_ptr<FunctionPrototypeNode> prototype) -> std::unique_ptr<ExternFunctionDeclarationNode> {
-        return std::make_unique<ExternFunctionDeclarationNode>(std::move(prototype));
-    }
-    ExternFunctionDeclarationNode(
-        std::unique_ptr<FunctionPrototypeNode> prototype)
-        : ModuleStatementNode(ModuleStatementType::eExternFunctionDeclaration)
-        , prototype_(std::move(prototype)) {}
-    auto prototype() const -> std::unique_ptr<FunctionPrototypeNode> const& { return prototype_; }
-private:
-    std::unique_ptr<FunctionPrototypeNode> prototype_;
-};
-
-export
-class ModuleNode : public Node {
-public:
-    static auto Create(std::vector<std::unique_ptr<ModuleStatementNode>> body) -> std::unique_ptr<ModuleNode> {
-        return std::make_unique<ModuleNode>(std::move(body));
-    }
-    ModuleNode(std::vector<std::unique_ptr<ModuleStatementNode>> body) : body_(std::move(body)) {}
-    auto body() const -> std::vector<std::unique_ptr<ModuleStatementNode>> const& { return body_; }
-private:
-    std::vector<std::unique_ptr<ModuleStatementNode>> body_;
+struct ModuleNode : Node {
+    static auto Create(std::vector<uptr_t<ModuleStatementNode>> body) -> uptr_t<ModuleNode>;
+    std::vector<uptr_t<ModuleStatementNode>> body;
 };

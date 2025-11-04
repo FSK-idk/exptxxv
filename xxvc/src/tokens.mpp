@@ -31,31 +31,23 @@ enum class TokenType {
 };
 
 export
-class Token {
-public:
-    Token(TokenType type) : type_(type) {}
-    virtual ~Token() {}
-    auto type() const -> TokenType { return type_; }
-private:
-    TokenType type_;
+struct Token {
+    static auto Create(TokenType type) -> uptr_t<Token>;
+    static auto Destroy(Token* node) -> void;
+    TokenType type;
+};
+
+template <>
+struct enable_self_destroy<Token> : std::true_type {};
+
+export
+struct IdentifierToken : Token {
+    static auto Create(std::string name) -> uptr_t<IdentifierToken>;
+    std::string name;
 };
 
 export
-class IdentifierToken : public Token {
-public:
-    IdentifierToken(std::string name)
-        : Token(TokenType::eIdentifier), name_(std::move(name)) {}
-    auto name() const -> std::string const& { return name_; }
-private:
-    std::string name_;
-};
-
-export
-class NumberToken : public Token {
-public:
-    NumberToken(f64 value)
-        : Token(TokenType::eNumber), value_(value) {}
-    auto value() const -> f64 { return value_; }
-private:
-    f64 value_;
+struct NumberToken : Token {
+    static auto Create(f64 value) -> uptr_t<NumberToken>;
+    f64 value;
 };

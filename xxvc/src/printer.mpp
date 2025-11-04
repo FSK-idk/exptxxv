@@ -11,178 +11,175 @@ class Printer {
 public:
     Printer() : step_(2), space_(-step_) {}
 
-    template <class T>
-    auto print(T const& node) -> void;
-
-    auto print(ModuleNode const& node) -> void {
+    auto print(ModuleNode* node) -> void {
         advance();
         indent(); std::println("module");
         indent(); std::println("-body");
-        for (auto& statement : node.body()) print(*statement);
+        for (auto& statement : node->body) print(statement.get());
         retreat();
     }
 
-    auto print(ModuleStatementNode const& node) -> void {
-        switch (node.type()) {
+    auto print(ModuleStatementNode* node) -> void {
+        switch (node->type) {
         case ModuleStatementType::eFunctionDeclaration:
-            print(static_cast<FunctionDeclarationNode const&>(node)); break;
+            print(static_cast<FunctionDeclarationNode*>(node)); break;
         case ModuleStatementType::eFunctionDefinition:
-            print(static_cast<FunctionDefinitionNode const&>(node)); break;
+            print(static_cast<FunctionDefinitionNode*>(node)); break;
         case ModuleStatementType::eExternFunctionDeclaration:
-            print(static_cast<ExternFunctionDeclarationNode const&>(node)); break;
+            print(static_cast<ExternFunctionDeclarationNode*>(node)); break;
         default:
             indent(); std::println("UNKNOWN NODE"); break;
         }
     }
 
-    auto print(FunctionDeclarationNode const& node) -> void {
+    auto print(FunctionDeclarationNode* node) -> void {
         advance();
         indent(); std::println("function-declaration");
         indent(); std::println("-prototype");
-        print(*node.prototype());
+        print(node->prototype.get());
         retreat();
     }
 
-    auto print(FunctionDefinitionNode const& node) -> void {
+    auto print(FunctionDefinitionNode* node) -> void {
         advance();
         indent(); std::println("function-definition");
         indent(); std::println("-prototype");
-        print(*node.prototype());
+        print(node->prototype.get());
         indent(); std::println("-body");
-        for (auto& statement : node.body()) print(*statement);
+        for (auto& statement : node->body) print(statement.get());
         retreat();
     }
 
-    auto print(ExternFunctionDeclarationNode const& node) -> void {
+    auto print(ExternFunctionDeclarationNode* node) -> void {
         advance();
         indent(); std::println("extern-function-declaration");
         indent(); std::println("-prototype");
-        print(*node.prototype());
+        print(node->prototype.get());
         retreat();
     }
 
-    auto print(FunctionPrototypeNode const& node) -> void {
+    auto print(FunctionPrototypeNode* node) -> void {
         advance();
         indent(); std::println("function-prototype");
         indent(); std::println("-identifier");
-        print(*node.identifier());
+        print(node->identifier.get());
         indent(); std::println("-args");
-        for (auto& arg : node.args()) print(*arg);
+        for (auto& arg : node->args) print(arg.get());
         retreat();
     }
 
-    auto print(FunctionStatementNode const& node) -> void {
-        switch (node.type()) {
+    auto print(FunctionStatementNode* node) -> void {
+        switch (node->type) {
         case FunctionStatementType::eVariableDeclaration:
-            print(static_cast<VariableDeclarationNode const&>(node)); break;
+            print(static_cast<VariableDeclarationNode*>(node)); break;
         case FunctionStatementType::eVariableDefinition:
-            print(static_cast<VariableDefinitionNode const&>(node)); break;
+            print(static_cast<VariableDefinitionNode*>(node)); break;
         case FunctionStatementType::eReturnStatement:
-            print(static_cast<ReturnStatementNode const&>(node)); break;
+            print(static_cast<ReturnStatementNode*>(node)); break;
         default:
             indent(); std::println("UNKNOWN NODE"); break;
         }
     }
 
-    auto print(VariableDeclarationNode const& node) -> void {
+    auto print(VariableDeclarationNode* node) -> void {
         advance();
         indent(); std::println("variable-declaration");
         indent(); std::println("-identifier");
-        print(*node.identifier());
+        print(node->identifier.get());
         retreat();
     }
 
-    auto print(VariableDefinitionNode const& node) -> void {
+    auto print(VariableDefinitionNode* node) -> void {
         advance();
         indent(); std::println("variable-declaration");
         indent(); std::println("-identifier");
-        print(*node.identifier());
+        print(node->identifier.get());
         indent(); std::println("-expression");
-        print(*node.expression());
+        print(node->expression.get());
         retreat();
     }
 
-    auto print(ReturnStatementNode const& node) -> void {
+    auto print(ReturnStatementNode* node) -> void {
         advance();
         indent(); std::println("return-statement");
         indent(); std::println("-expression");
-        print(*node.expression());
+        print(node->expression.get());
         retreat();
     }
 
-    auto print(ExpressionNode const& node) -> void {
-        switch (node.type()) {
+    auto print(ExpressionNode* node) -> void {
+        switch (node->type) {
         case ExpressionType::eBinaryExpression:
-            print(static_cast<BinaryExpressionNode const&>(node)); break;
+            print(static_cast<BinaryExpressionNode*>(node)); break;
         case ExpressionType::eVariableExpression:
-            print(static_cast<VariableExpressionNode const&>(node)); break;
+            print(static_cast<VariableExpressionNode*>(node)); break;
         case ExpressionType::eNumberExpression:
-            print(static_cast<NumberExpressionNode const&>(node)); break;
+            print(static_cast<NumberExpressionNode*>(node)); break;
         case ExpressionType::eEmptyExpression:
-            print(static_cast<EmptyExpressionNode const&>(node)); break;
+            print(static_cast<EmptyExpressionNode*>(node)); break;
         default:
             indent(); std::println("UNKNOWN NODE"); break;
         }
     }
 
-    auto print(BinaryExpressionNode const& node) -> void {
+    auto print(BinaryExpressionNode* node) -> void {
         advance();
         indent(); std::println("binary-expression");
         indent(); std::println("-binary-operator");
-        print(*node.binaryOperator());
+        print(node->binaryOperator.get());
         indent(); std::println("-lhs");
-        print(*node.lhs());
+        print(node->lhs.get());
         indent(); std::println("-rhs");
-        print(*node.rhs());
+        print(node->rhs.get());
         retreat();
     }
 
-    auto print(VariableExpressionNode const& node) -> void {
+    auto print(VariableExpressionNode* node) -> void {
         advance();
         indent(); std::println("variable-expression");
         indent(); std::println("-identifier");
-        print(*node.identifier());
+        print(node->identifier.get());
         retreat();
     }
 
-    auto print(NumberExpressionNode const& node) -> void {
+    auto print(NumberExpressionNode* node) -> void {
         advance();
         indent(); std::println("number-expression");
         indent(); std::println("-number");
-        print(*node.number());
+        print(node->number.get());
         retreat();
     }
 
-    auto print(EmptyExpressionNode const& node) -> void {
+    auto print(EmptyExpressionNode* node) -> void {
         advance();
         indent(); std::println("empty-expression");
         retreat();
     }
 
-    auto print(IdentifierNode const& node) -> void {
+    auto print(IdentifierNode* node) -> void {
         advance();
         indent(); std::println("identifier");
         indent(); std::println("-name");
-        indent(); std::println("  {}", node.name());
+        indent(); std::println("  {}", node->name);
         retreat();
     }
 
-    auto print(NumberNode const& node) -> void {
+    auto print(NumberNode* node) -> void {
         advance();
         indent(); std::println("number");
         indent(); std::println("-value");
         advance();
-        indent(); std::println("{}", node.value());
+        indent(); std::println("{}", node->value);
         retreat();
         retreat();
     }
 
-    auto print(BinaryOperatorNode const& node) -> void {
+    auto print(BinaryOperatorNode* node) -> void {
         advance();
         indent(); std::println("binary-operator");
         indent(); std::println("-type");
         advance();
-        switch (node.type()) {
+        switch (node->type) {
         case BinaryOperatorType::eAddition:
             indent(); std::println("addition"); break;
         case BinaryOperatorType::eSubtraction:

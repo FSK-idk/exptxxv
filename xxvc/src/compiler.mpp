@@ -6,6 +6,7 @@ import tokens;
 import lexer;
 import nodes;
 import parser;
+import printer;
 import codegen;
 
 
@@ -20,9 +21,15 @@ public:
 
         Parser parser;
         auto moduleNode = parser.parse(std::move(tokens));
+
         if (!moduleNode) {
             std::println("parse failed");
             return false;
+        }
+        else {
+            Printer printer;
+            std::println("{:=<40}", "= ast =");
+            printer.print(*moduleNode);
         }
 
         Codegen codegen;

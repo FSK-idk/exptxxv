@@ -133,7 +133,7 @@ private:
             variables_[node->identifier()->name()] = alloca;
         }
         auto alloca = variables_[node->identifier()->name()];
-        if (node->expression()) {
+        if (node->expression()->type() != ExpressionType::eEmptyExpression) {
             auto expression = codegenExpression(node->expression().get());
             builder_->CreateStore(expression, alloca);
         }

@@ -18,6 +18,7 @@ enum class ExpressionType {
     eBinaryExpression,
     eVariableExpression,
     eNumberExpression,
+    eEmptyExpression,
 };
 
 export
@@ -137,6 +138,15 @@ public:
     auto number() const -> std::unique_ptr<NumberNode> const& { return number_; }
 private:
     std::unique_ptr<NumberNode> number_;
+};
+
+export
+class EmptyExpressionNode : public ExpressionNode {
+public:
+    static auto Create() -> std::unique_ptr<EmptyExpressionNode> {
+        return std::make_unique<EmptyExpressionNode>();
+    }
+    EmptyExpressionNode() : ExpressionNode(ExpressionType::eEmptyExpression) {}
 };
 
 export

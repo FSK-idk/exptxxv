@@ -33,23 +33,28 @@ import nodes;
 // variable-declaration
 //   ::= identifier ';'
 // variable-definition
-//   ::= identifier ':' '{' expression? '}' ';'
+//   ::= identifier ':' '{' expression '}' ';'
 // return-statement
 //   ::= 'return' expression ';'
 //
 // expression
-//   ::= primary-expression
 //   ::= binary-expression
+//   ::= primary-expression
 // binary-expression
-//   ::= expression binary-operator expression
+//   ::= ( primary-expression - empty-expression | binary-expression - empty-expression )
+//       binary-operator
+//       ( primary-expression - empty-expression | binary-expression - empty-expression )
 // primary-expression
 //   ::= '(' expression ')'
 //   ::= variable-expression
 //   ::= number-expression
+//   ::= empty-expression
 // variable-expression
 //   ::= identifier
 // number-expression
 //   ::= number
+// empty-expression
+//   ::=
 //
 // identifier
 //   ::= identifier-token
@@ -198,7 +203,7 @@ private:
     // variable-declaration
     //   ::= identifier ';'
     // variable-definition
-    //   ::= identifier ':' '{' expression? '}' ';'
+    //   ::= identifier ':' '{' expression '}' ';'
     // return-statement
     //   ::= 'return' expression ';'
     auto parseFunctionStatement() -> std::unique_ptr<FunctionStatementNode> {
@@ -219,15 +224,6 @@ private:
                 return nullptr;
             }
             advanceToken();
-            if (token()->type == TokenType::eRightCurlyBracket) {
-                advanceToken();
-                if (token()->type != TokenType::eSemicolon) {
-                    std::println("exprected semicolon");
-                    return nullptr;
-                }
-                advanceToken();
-                return VariableDefinitionNode::Create(std::move(identifier), nullptr);
-            }
             auto expression = parseExpression();
             if (!expression) return nullptr;
             if (token()->type != TokenType::eRightCurlyBracket) {
@@ -263,6 +259,7 @@ private:
     auto parseExpression() -> std::unique_ptr<ExpressionNode> {
         auto expression = parsePrimaryExpression();
         if (!expression) return nullptr;
+        if (expression->type() == ExpressionType::eEmptyExpression) return expression;
         expression = parseBinaryExpressionRhs(0, std::move(expression));
         if (!expression) return nullptr;
         return expression;
@@ -272,10 +269,13 @@ private:
     //   ::= '(' expression ')'
     //   ::= variable-expression
     //   ::= number-expression
+    //   ::= empty-expression
     // variable-expression
     //   ::= identifier
     // number-expression
     //   ::= number
+    // empty-expression
+    //   ::=
     auto parsePrimaryExpression() -> std::unique_ptr<ExpressionNode> {
         if (token()->type == TokenType::eLeftRoundBracket) {
             advanceToken();
@@ -298,12 +298,13 @@ private:
             if (!number) return nullptr;
             return NumberExpressionNode::Create(std::move(number));
         }
-        std::println("expected expression");
-        return nullptr;
+        return EmptyExpressionNode::Create();
     }
 
     // binary-expression
-    //   ::= expression binary-operator expression
+    //   ::= ( primary-expression - empty-expression | binary-expression - empty-expression )
+    //       binary-operator
+    //       ( primary-expression - empty-expression | binary-expression - empty-expression )
     auto parseBinaryExpressionRhs(u64 currentPrecedence, std::unique_ptr<ExpressionNode> lhs) -> std::unique_ptr<ExpressionNode> {
         static std::map<BinaryOperatorType, i32> precedence = {
             { BinaryOperatorType::eAddition,       1 },
@@ -319,10 +320,18 @@ private:
             advanceToken();
             auto rhs = parsePrimaryExpression();
             if (!rhs) return nullptr;
+            if (rhs->type() == ExpressionType::eEmptyExpression) {
+                std::println("expected non-empty expression");
+                return nullptr;
+            }
             auto nextBinaryOperator = peekBinaryOperator();
             if (nextBinaryOperator && precedence[binaryOperator->type()] < precedence[nextBinaryOperator->type()]) {
                 rhs = parseBinaryExpressionRhs(precedence[nextBinaryOperator->type()], std::move(rhs));
                 if (!rhs) return nullptr;
+                if (rhs->type() == ExpressionType::eEmptyExpression) {
+                    std::println("expected non-empty expression");
+                    return nullptr;
+                }
             }
             lhs = BinaryExpressionNode::Create(std::move(binaryOperator), std::move(lhs), std::move(rhs));
         }

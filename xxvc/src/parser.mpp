@@ -24,16 +24,16 @@ import nodes;
 //   ::= 'extern' function-prototype ';'
 //
 // function-prototype
-//   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
+//   ::= identifier-token ':' '(' ( identifier-token ( ',' identifier-token )* ','? )? ')'
 //
 // function-statement
 //   ::= variable-declaration
 //   ::= variable-definition
 //   ::= return-statement
 // variable-declaration
-//   ::= identifier ';'
+//   ::= identifier-token ';'
 // variable-definition
-//   ::= identifier ':' '{' expression '}' ';'
+//   ::= identifier-token ':' '{' expression '}' ';'
 // return-statement
 //   ::= 'return' expression ';'
 //
@@ -51,11 +51,11 @@ import nodes;
 //   ::= number-expression
 //   ::= empty-expression
 // function-call-expression
-//   ::= identifier ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
+//   ::= identifier-token ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
 // variable-expression
-//   ::= identifier
+//   ::= identifier-token
 // number-expression
-//   ::= number
+//   ::= number-token
 // empty-expression
 //   ::=
 //
@@ -136,10 +136,11 @@ private:
     }
 
     // function-prototype
-    //   ::= identifier ':' '(' ( identifier ( ',' identifier )* ','? )? ')'
+    //   ::= identifier-token ':' '(' ( identifier-token ( ',' identifier-token )* ','? )? ')'
     auto parseFunctionPrototype() -> uptr_t<FunctionPrototypeNode> {
-        auto identifier = parseIdentifier();
-        if (!identifier) return nullptr;
+        auto identifier = consume<IdentifierToken>(TokenType::eIdentifier);
+        if (!identifier)
+            return error("expected identifier");
 
         if (!consume(TokenType::eColon))
             return error("expected colon");
@@ -147,11 +148,12 @@ private:
         if (!consume(TokenType::eLeftRoundBracket))
             return error("expected left round bracket");
 
-        std::vector<uptr_t<IdentifierNode>> args;
+        std::vector<std::string> args;
         if (!consume(TokenType::eRightRoundBracket)) {
-            auto identifier = parseIdentifier();
-            if (!identifier) return nullptr;
-            args.emplace_back(std::move(identifier));
+            auto identifier = consume<IdentifierToken>(TokenType::eIdentifier);
+            if (!identifier)
+                return error("expected identifier");
+            args.emplace_back(std::move(identifier->name));
 
             while (true) {
                 if (consume(TokenType::eRightRoundBracket)) break;
@@ -161,13 +163,14 @@ private:
 
                 if (consume(TokenType::eRightRoundBracket)) break;
 
-                auto identifier = parseIdentifier();
-                if (!identifier) return nullptr;
-                args.emplace_back(std::move(identifier));
+                auto identifier = consume<IdentifierToken>(TokenType::eIdentifier);
+                if (!identifier)
+                    return error("expected identifier");
+                args.emplace_back(std::move(identifier->name));
             }
         }
 
-        return FunctionPrototypeNode::Create(std::move(identifier), std::move(args));
+        return FunctionPrototypeNode::Create(std::move(identifier->name), std::move(args));
     }
 
     // function-statement
@@ -175,19 +178,15 @@ private:
     //   ::= variable-definition
     //   ::= return-statement
     // variable-declaration
-    //   ::= identifier ';'
+    //   ::= identifier-token ';'
     // variable-definition
-    //   ::= identifier ':' '{' expression '}' ';'
+    //   ::= identifier-token ':' '{' expression '}' ';'
     // return-statement
     //   ::= 'return' expression ';'
     auto parseFunctionStatement() -> uptr_t<FunctionStatementNode> {
-        // TODO: should we remove identifier and number nodes?
-        if (token()->type == TokenType::eIdentifier) {
-            auto identifier = parseIdentifier();
-            if (!identifier) return nullptr;
-            
+        if (auto identifier = consume<IdentifierToken>(TokenType::eIdentifier)) {
             if (consume(TokenType::eSemicolon))
-                return uptr_cast<FunctionStatementNode>(VariableDeclarationNode::Create(std::move(identifier)));
+                return uptr_cast<FunctionStatementNode>(VariableDeclarationNode::Create(std::move(identifier->name)));
 
             if (!consume(TokenType::eColon))
                 return error("expected colon");
@@ -204,7 +203,7 @@ private:
             if (!consume(TokenType::eSemicolon))
                 return error("expected semicolon");
 
-            return uptr_cast<FunctionStatementNode>(VariableDefinitionNode::Create(std::move(identifier), std::move(expression)));
+            return uptr_cast<FunctionStatementNode>(VariableDefinitionNode::Create(std::move(identifier->name), std::move(expression)));
         }
         else if (consume(TokenType::eReturn)) {
             auto expression = parseExpression();
@@ -241,11 +240,11 @@ private:
     //   ::= number-expression
     //   ::= empty-expression
     // function-call-expression
-    //   ::= identifier ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
+    //   ::= identifier-token ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
     // variable-expression
-    //   ::= identifier
+    //   ::= identifier-token
     // number-expression
-    //   ::= number
+    //   ::= number-token
     // empty-expression
     //   ::=
     auto parsePrimaryExpression() -> uptr_t<ExpressionNode> {
@@ -258,10 +257,7 @@ private:
 
             return expression;
         }
-        if (token()->type == TokenType::eIdentifier) {
-            auto identifier = parseIdentifier();
-            if (!identifier) return nullptr;
-
+        if (auto identifier = consume<IdentifierToken>(TokenType::eIdentifier)) {
             if (consume(TokenType::eLeftRoundBracket)) {
                 std::vector<uptr_t<ExpressionNode>> args;
                 if (!consume(TokenType::eRightRoundBracket)) {
@@ -290,16 +286,13 @@ private:
                     }
                 }
 
-                return uptr_cast<ExpressionNode>(FunctionCallExpressionNode::Create(std::move(identifier), std::move(args)));
+                return uptr_cast<ExpressionNode>(FunctionCallExpressionNode::Create(std::move(identifier->name), std::move(args)));
             }
 
-            return uptr_cast<ExpressionNode>(VariableExpressionNode::Create(std::move(identifier)));
+            return uptr_cast<ExpressionNode>(VariableExpressionNode::Create(std::move(identifier->name)));
         }
-        if (token()->type == TokenType::eNumber) {
-            auto number = parseNumber();
-            if (!number) return nullptr;
-
-            return uptr_cast<ExpressionNode>(NumberExpressionNode::Create(std::move(number)));
+        if (auto number = consume<NumberToken>(TokenType::eNumber)) {
+            return uptr_cast<ExpressionNode>(NumberExpressionNode::Create(number->value));
         }
 
         return uptr_cast<ExpressionNode>(EmptyExpressionNode::Create());
@@ -343,30 +336,6 @@ private:
         }
     }
 
-    // identifier
-    //   ::= identifier-token
-    auto parseIdentifier() -> uptr_t<IdentifierNode> {
-        if (token()->type != TokenType::eIdentifier) {
-            std::println("expected identifier");
-            return nullptr;
-        }
-        auto identifier = static_cast<IdentifierToken*>(token());
-        advance();
-        return IdentifierNode::Create(identifier->name);
-    }
-
-    // number
-    //   ::= number-token
-    auto parseNumber() -> uptr_t<NumberNode> {
-        if (token()->type != TokenType::eNumber) {
-            std::println("expected number");
-            return nullptr;
-        }
-        auto number = static_cast<NumberToken*>(token());
-        advance();
-        return NumberNode::Create(number->value);
-    }
-
     // binary-operator
     //   ::= '+' | '-' | '*' | '/'
     auto peekBinaryOperator() -> uptr_t<BinaryOperatorNode> {
@@ -385,8 +354,9 @@ private:
 private:
     auto token() -> Token* { return tokens_[tokenIndex_].get(); }
     auto advance() -> void { ++tokenIndex_; }
-    auto consume(TokenType type) -> Token* {
-        if (token()->type == type) { return tokens_[tokenIndex_++].get(); }
+    template <class T = Token>
+    auto consume(TokenType type) -> T* {
+        if (token()->type == type) { return static_cast<T*>(tokens_[tokenIndex_++].get()); }
         return nullptr;
     }
     template <class... Args>

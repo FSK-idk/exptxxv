@@ -5,22 +5,6 @@ module;
 module nodes;
 
 
-// IdentifierNode
-
-auto IdentifierNode::Create(std::string name) -> uptr_t<IdentifierNode> {
-    return uptr_t<IdentifierNode>{
-        new IdentifierNode{ {}, std::move(name) }
-    };
-}
-
-// NumberNode
-
-auto NumberNode::Create(f64 value) -> uptr_t<NumberNode> {
-    return uptr_t<NumberNode>{
-        new NumberNode{ {}, value }
-    };
-}
-
 // BinaryOperatorNode
 
 auto BinaryOperatorNode::Create(BinaryOperatorType type) -> uptr_t<BinaryOperatorNode> {
@@ -58,25 +42,25 @@ auto BinaryExpressionNode::Create(uptr_t<BinaryOperatorNode> binaryOperator, upt
 
 // FunctionCallExpressionNode
 
-auto FunctionCallExpressionNode::Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode> {
+auto FunctionCallExpressionNode::Create(std::string name, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode> {
     return uptr_t<FunctionCallExpressionNode>{
-        new FunctionCallExpressionNode{ { {}, ExpressionType::eFunctionCallExpression }, std::move(identifier), std::move(args) }
+        new FunctionCallExpressionNode{ { {}, ExpressionType::eFunctionCallExpression }, std::move(name), std::move(args) }
     };
 }
 
 // VariableExpressionNode
 
-auto VariableExpressionNode::Create(uptr_t<IdentifierNode> identifier) -> uptr_t<VariableExpressionNode> {
+auto VariableExpressionNode::Create(std::string name) -> uptr_t<VariableExpressionNode> {
     return uptr_t<VariableExpressionNode>{
-        new VariableExpressionNode{ { {}, ExpressionType::eVariableExpression }, std::move(identifier) }
+        new VariableExpressionNode{ { {}, ExpressionType::eVariableExpression }, std::move(name) }
     };
 }
 
 // NumberExpressionNode
 
-auto NumberExpressionNode::Create(uptr_t<NumberNode> number) -> uptr_t<NumberExpressionNode> {
+auto NumberExpressionNode::Create(f64 value) -> uptr_t<NumberExpressionNode> {
     return uptr_t<NumberExpressionNode>{
-        new NumberExpressionNode{ { {}, ExpressionType::eNumberExpression }, std::move(number) }
+        new NumberExpressionNode{ { {}, ExpressionType::eNumberExpression }, value }
     };
 }
 
@@ -105,17 +89,17 @@ auto FunctionStatementNode::Destroy(FunctionStatementNode* node) -> void {
 
 // VariableDeclarationNode
 
-auto VariableDeclarationNode::Create(uptr_t<IdentifierNode> identifier) -> uptr_t<VariableDeclarationNode> {
+auto VariableDeclarationNode::Create(std::string name) -> uptr_t<VariableDeclarationNode> {
     return uptr_t<VariableDeclarationNode>{
-        new VariableDeclarationNode{ { {}, FunctionStatementType::eVariableDeclaration }, std::move(identifier) }
+        new VariableDeclarationNode{ { {}, FunctionStatementType::eVariableDeclaration }, std::move(name) }
     };
 }
 
 // VariableDefinitionNode
 
-auto VariableDefinitionNode::Create(uptr_t<IdentifierNode> identifier, uptr_t<ExpressionNode> expression) -> uptr_t<VariableDefinitionNode> {
+auto VariableDefinitionNode::Create(std::string name, uptr_t<ExpressionNode> expression) -> uptr_t<VariableDefinitionNode> {
     return uptr_t<VariableDefinitionNode>{
-        new VariableDefinitionNode{ { {}, FunctionStatementType::eVariableDefinition }, std::move(identifier), std::move(expression) }
+        new VariableDefinitionNode{ { {}, FunctionStatementType::eVariableDefinition }, std::move(name), std::move(expression) }
     };
 }
 
@@ -129,9 +113,9 @@ auto ReturnStatementNode::Create(uptr_t<ExpressionNode> expression) -> uptr_t<Re
 
 // FunctionPrototypeNode
 
-auto FunctionPrototypeNode::Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<IdentifierNode>> args) -> uptr_t<FunctionPrototypeNode> {
+auto FunctionPrototypeNode::Create(std::string name, std::vector<std::string> args) -> uptr_t<FunctionPrototypeNode> {
     return uptr_t<FunctionPrototypeNode>{
-        new FunctionPrototypeNode{ {}, std::move(identifier), std::move(args) }
+        new FunctionPrototypeNode{ {}, std::move(name), std::move(args) }
     };
 }
 

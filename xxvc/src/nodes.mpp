@@ -40,18 +40,6 @@ export
 struct Node {};
 
 export
-struct IdentifierNode : Node {
-    static auto Create(std::string name) -> uptr_t<IdentifierNode>;
-    std::string name;
-};
-
-export
-struct NumberNode : Node {
-    static auto Create(f64 value) -> uptr_t<NumberNode>;
-    f64 value;
-};
-
-export
 struct BinaryOperatorNode : Node {
     static auto Create(BinaryOperatorType type) -> uptr_t<BinaryOperatorNode>;
     BinaryOperatorType type;
@@ -76,21 +64,21 @@ struct BinaryExpressionNode : ExpressionNode {
 
 export
 struct FunctionCallExpressionNode : ExpressionNode {
-    static auto Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode>;
-    uptr_t<IdentifierNode> identifier;
+    static auto Create(std::string name, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode>;
+    std::string name;
     std::vector<uptr_t<ExpressionNode>> args;
 };
 
 export
 struct VariableExpressionNode : ExpressionNode {
-    static auto Create(uptr_t<IdentifierNode> identifier) -> uptr_t<VariableExpressionNode>;
-    uptr_t<IdentifierNode> identifier;
+    static auto Create(std::string name) -> uptr_t<VariableExpressionNode>;
+    std::string name;
 };
 
 export
 struct NumberExpressionNode : ExpressionNode {
-    static auto Create(uptr_t<NumberNode> number) -> uptr_t<NumberExpressionNode>;
-    uptr_t<NumberNode> number;
+    static auto Create(f64 value) -> uptr_t<NumberExpressionNode>;
+    f64 value;
 };
 
 export
@@ -109,14 +97,14 @@ struct enable_self_destroy<FunctionStatementNode> : std::true_type {};
 
 export
 struct VariableDeclarationNode : FunctionStatementNode {
-    static auto Create(uptr_t<IdentifierNode> identifier) -> uptr_t<VariableDeclarationNode>;
-    uptr_t<IdentifierNode> identifier;
+    static auto Create(std::string name) -> uptr_t<VariableDeclarationNode>;
+    std::string name;
 };
 
 export
 struct VariableDefinitionNode : FunctionStatementNode {
-    static auto Create(uptr_t<IdentifierNode> identifier, uptr_t<ExpressionNode> expression) -> uptr_t<VariableDefinitionNode>;
-    uptr_t<IdentifierNode> identifier;
+    static auto Create(std::string name, uptr_t<ExpressionNode> expression) -> uptr_t<VariableDefinitionNode>;
+    std::string name;
     uptr_t<ExpressionNode> expression;
 };
 
@@ -128,9 +116,9 @@ struct ReturnStatementNode : FunctionStatementNode {
 
 export
 struct FunctionPrototypeNode : Node {
-    static auto Create(uptr_t<IdentifierNode> identifier, std::vector<uptr_t<IdentifierNode>> args) -> uptr_t<FunctionPrototypeNode>;
-    uptr_t<IdentifierNode> identifier;
-    std::vector<uptr_t<IdentifierNode>> args;
+    static auto Create(std::string name, std::vector<std::string> args) -> uptr_t<FunctionPrototypeNode>;
+    std::string name;
+    std::vector<std::string> args;
 };
 
 export

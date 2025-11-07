@@ -66,9 +66,10 @@ public:
         advance();
         indent(); std::println("function-prototype");
         indent(); std::println("-identifier");
-        print(node->identifier.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
         indent(); std::println("-args");
-        for (auto& arg : node->args) print(arg.get());
+        for (auto& arg : node->args) print("{}", arg);
         retreat();
     }
 
@@ -88,16 +89,16 @@ public:
     auto print(VariableDeclarationNode* node) -> void {
         advance();
         indent(); std::println("variable-declaration");
-        indent(); std::println("-identifier");
-        print(node->identifier.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
         retreat();
     }
 
     auto print(VariableDefinitionNode* node) -> void {
         advance();
         indent(); std::println("variable-declaration");
-        indent(); std::println("-identifier");
-        print(node->identifier.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
         indent(); std::println("-expression");
         print(node->expression.get());
         retreat();
@@ -143,8 +144,8 @@ public:
     auto print(FunctionCallExpressionNode* node) -> void {
         advance();
         indent(); std::println("function-call-expression");
-        indent(); std::println("-identifier");
-        print(node->identifier.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
         indent(); std::println("-args");
         for (auto& arg : node->args) print(arg.get());
         retreat();
@@ -153,40 +154,22 @@ public:
     auto print(VariableExpressionNode* node) -> void {
         advance();
         indent(); std::println("variable-expression");
-        indent(); std::println("-identifier");
-        print(node->identifier.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
         retreat();
     }
 
     auto print(NumberExpressionNode* node) -> void {
         advance();
         indent(); std::println("number-expression");
-        indent(); std::println("-number");
-        print(node->number.get());
+        indent(); std::println("-value");
+        print("{}", node->value);
         retreat();
     }
 
     auto print(EmptyExpressionNode* node) -> void {
         advance();
         indent(); std::println("empty-expression");
-        retreat();
-    }
-
-    auto print(IdentifierNode* node) -> void {
-        advance();
-        indent(); std::println("identifier");
-        indent(); std::println("-name");
-        indent(); std::println("  {}", node->name);
-        retreat();
-    }
-
-    auto print(NumberNode* node) -> void {
-        advance();
-        indent(); std::println("number");
-        indent(); std::println("-value");
-        advance();
-        indent(); std::println("{}", node->value);
-        retreat();
         retreat();
     }
 
@@ -215,6 +198,13 @@ private:
     auto indent() -> void { std::print("{}", std::string(space_, ' ')); }
     auto advance() -> void { space_ += step_; }
     auto retreat() -> void { space_ -= step_; }
+    template <class... Args>
+    auto print(std::format_string<Args...> fmt, Args&&... args) -> void {
+        advance();
+        indent(); std::println(fmt, std::forward<Args>(args)...);
+        retreat();
+    }
+
 
 private:
     u64 step_;

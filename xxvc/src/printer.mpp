@@ -26,11 +26,11 @@ public:
     auto print(ModuleStatementNode* node) -> void {
         switch (node->type) {
         case ModuleStatementType::eFunctionDeclaration:
-            print(static_cast<FunctionDeclarationNode*>(node)); break;
+            return print(static_cast<FunctionDeclarationNode*>(node));
         case ModuleStatementType::eFunctionDefinition:
-            print(static_cast<FunctionDefinitionNode*>(node)); break;
+            return print(static_cast<FunctionDefinitionNode*>(node));
         case ModuleStatementType::eExternFunctionDeclaration:
-            print(static_cast<ExternFunctionDeclarationNode*>(node)); break;
+            return print(static_cast<ExternFunctionDeclarationNode*>(node));
         default:
             assert(false && "add case");
         }
@@ -76,11 +76,11 @@ public:
     auto print(FunctionStatementNode* node) -> void {
         switch (node->type) {
         case FunctionStatementType::eVariableDeclaration:
-            print(static_cast<VariableDeclarationNode*>(node)); break;
+            return print(static_cast<VariableDeclarationNode*>(node));
         case FunctionStatementType::eVariableDefinition:
-            print(static_cast<VariableDefinitionNode*>(node)); break;
+            return print(static_cast<VariableDefinitionNode*>(node));
         case FunctionStatementType::eReturnStatement:
-            print(static_cast<ReturnStatementNode*>(node)); break;
+            return print(static_cast<ReturnStatementNode*>(node));
         default:
             assert(false && "add case");
         }
@@ -115,15 +115,15 @@ public:
     auto print(ExpressionNode* node) -> void {
         switch (node->type) {
         case ExpressionType::eBinaryExpression:
-            print(static_cast<BinaryExpressionNode*>(node)); break;
+            return print(static_cast<BinaryExpressionNode*>(node));
         case ExpressionType::eFunctionCallExpression:
-            print(static_cast<FunctionCallExpressionNode*>(node)); break;
+            return print(static_cast<FunctionCallExpressionNode*>(node));
         case ExpressionType::eVariableExpression:
-            print(static_cast<VariableExpressionNode*>(node)); break;
+            return print(static_cast<VariableExpressionNode*>(node));
         case ExpressionType::eNumberExpression:
-            print(static_cast<NumberExpressionNode*>(node)); break;
+            return print(static_cast<NumberExpressionNode*>(node));
         case ExpressionType::eEmptyExpression:
-            print(static_cast<EmptyExpressionNode*>(node)); break;
+            return print(static_cast<EmptyExpressionNode*>(node));
         default:
             assert(false && "add case");
         }

@@ -73,9 +73,10 @@ public:
     Parser(std::vector<uptr_t<Token>> const& tokens)
         : tokens_(tokens), moduleNode_(nullptr) {}
 
-    auto parse() -> void {
+    auto parse() -> b8 {
         tokenIndex_ = 0;
         moduleNode_ = parseModule();
+        return moduleNode_ != nullptr;
     }
 
     auto moduleNode() const -> uptr_t<ModuleNode> const& { return moduleNode_; }

@@ -18,15 +18,15 @@ auto BinaryOperatorNode::Create(BinaryOperatorType type) -> uptr_t<BinaryOperato
 auto ExpressionNode::Destroy(ExpressionNode* node) -> void {
     switch (node->type) {
     case ExpressionType::eBinaryExpression:
-        SelfDestructor<BinaryExpressionNode>{}(static_cast<BinaryExpressionNode*>(node)); break;
+        return SelfDestructor<BinaryExpressionNode>{}(static_cast<BinaryExpressionNode*>(node));
     case ExpressionType::eFunctionCallExpression:
-        SelfDestructor<FunctionCallExpressionNode>{}(static_cast<FunctionCallExpressionNode*>(node)); break;
+        return SelfDestructor<FunctionCallExpressionNode>{}(static_cast<FunctionCallExpressionNode*>(node));
     case ExpressionType::eVariableExpression:
-        SelfDestructor<VariableExpressionNode>{}(static_cast<VariableExpressionNode*>(node)); break;
+        return SelfDestructor<VariableExpressionNode>{}(static_cast<VariableExpressionNode*>(node));
     case ExpressionType::eNumberExpression:
-        SelfDestructor<NumberExpressionNode>{}(static_cast<NumberExpressionNode*>(node)); break;
+        return SelfDestructor<NumberExpressionNode>{}(static_cast<NumberExpressionNode*>(node));
     case ExpressionType::eEmptyExpression:
-        SelfDestructor<EmptyExpressionNode>{}(static_cast<EmptyExpressionNode*>(node)); break;
+        return SelfDestructor<EmptyExpressionNode>{}(static_cast<EmptyExpressionNode*>(node));
     default:
         assert(false && "add case");
     }
@@ -77,11 +77,11 @@ auto EmptyExpressionNode::Create() -> uptr_t<EmptyExpressionNode> {
 auto FunctionStatementNode::Destroy(FunctionStatementNode* node) -> void {
     switch (node->type) {
     case FunctionStatementType::eVariableDeclaration:
-        SelfDestructor<VariableDeclarationNode>{}(static_cast<VariableDeclarationNode*>(node)); break;
+        return SelfDestructor<VariableDeclarationNode>{}(static_cast<VariableDeclarationNode*>(node));
     case FunctionStatementType::eVariableDefinition:
-        SelfDestructor<VariableDefinitionNode>{}(static_cast<VariableDefinitionNode*>(node)); break;
+        return SelfDestructor<VariableDefinitionNode>{}(static_cast<VariableDefinitionNode*>(node));
     case FunctionStatementType::eReturnStatement:
-        SelfDestructor<ReturnStatementNode>{}(static_cast<ReturnStatementNode*>(node)); break;
+        return SelfDestructor<ReturnStatementNode>{}(static_cast<ReturnStatementNode*>(node));
     default:
         assert(false && "add case");
     }
@@ -124,11 +124,11 @@ auto FunctionPrototypeNode::Create(std::string name, std::vector<std::string> ar
 auto ModuleStatementNode::Destroy(ModuleStatementNode* node) -> void {
     switch (node->type) {
     case ModuleStatementType::eFunctionDeclaration:
-        SelfDestructor<FunctionDeclarationNode>{}(static_cast<FunctionDeclarationNode*>(node)); break;
+        return SelfDestructor<FunctionDeclarationNode>{}(static_cast<FunctionDeclarationNode*>(node));
     case ModuleStatementType::eFunctionDefinition:
-        SelfDestructor<FunctionDefinitionNode>{}(static_cast<FunctionDefinitionNode*>(node)); break;
+        return SelfDestructor<FunctionDefinitionNode>{}(static_cast<FunctionDefinitionNode*>(node));
     case ModuleStatementType::eExternFunctionDeclaration:
-        SelfDestructor<ExternFunctionDeclarationNode>{}(static_cast<ExternFunctionDeclarationNode*>(node)); break;
+        return SelfDestructor<ExternFunctionDeclarationNode>{}(static_cast<ExternFunctionDeclarationNode*>(node));
     default:
         assert(false && "add case");
     }

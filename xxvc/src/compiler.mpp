@@ -1,3 +1,7 @@
+module;
+
+#include <llvm/Support/raw_os_ostream.h>
+
 export module compiler;
 
 import std;
@@ -15,25 +19,31 @@ class Compiler {
 public:
     Compiler(b8 printOpt = false) : printOpt_(printOpt) {}
 
-    auto exec(std::string program, std::string const& outputFilename) -> bool {
+    auto exec(std::string program, std::string const& outputFilename) -> b8 {
         Lexer lexer(std::move(program));
         lexer.tokenize();
 
         Parser parser(lexer.tokens());
-        parser.parse();
-
-        if (!parser.moduleNode()) {
+        if (!parser.parse()) {
             std::println("parse failed");
             return false;
         }
-        else if (printOpt_) {
+
+        if (printOpt_) {
             Printer printer;
             std::println("{:=<40}", "= ast =");
             printer.print(parser.moduleNode().get());
         }
 
-        Codegen codegen;
-        auto output = codegen.codegen(parser.moduleNode().get());
+        Codegen codegen(parser.moduleNode());
+        if (!codegen.codegenModule()) {
+            std::println("failed to codegen");
+            return false;
+        }
+
+        std::string output;
+        llvm::raw_string_ostream os(output);
+        codegen.module()->print(os, nullptr);
 
         if (printOpt_) {
             std::println("{:=<40}", "= input =");

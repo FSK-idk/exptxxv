@@ -1,13 +1,14 @@
+take2: ();
+
+mult2: (x) {
+    return x * take2();
+};
+
 take2: () {
     return 2;
 };
 
-mult3: (x) {
-    return x * 3;
-};
-
 main: () {
     varb: { 4 };
-    vara: { mult3(take2()) };
-    return vara + varb;
+    return mult2(1) + varb;
 };

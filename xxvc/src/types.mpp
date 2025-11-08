@@ -19,6 +19,8 @@ export {
 template <class T>
 struct enable_self_destroy : std::false_type {};
 
+}
+
 template <class T>
 concept SelfDestructable =
     requires (T* node) {
@@ -27,19 +29,32 @@ concept SelfDestructable =
     };
 
 template <class T>
-struct SelfDestructor;
-
-template <class T>
 requires SelfDestructable<T>
-struct SelfDestructor<T> {
+struct Destroy {
     auto operator() (T* node) -> void {
         T::Destroy(node);
     }
 };
 
 template <class T>
+struct SelfDestructorImpl;
+
+template <class T>
+requires SelfDestructable<T>
+struct SelfDestructorImpl<T> {
+    using type = Destroy<T>;
+};
+
+template <class T>
 requires (!SelfDestructable<T>)
-struct SelfDestructor<T> : std::default_delete<T> {};
+struct SelfDestructorImpl<T> {
+    using type = std::default_delete<T>;
+};
+
+export {
+
+template <class T>
+using SelfDestructor = SelfDestructorImpl<T>::type;
 
 template <class T>
 using uptr_t = std::unique_ptr<T, SelfDestructor<T>>;

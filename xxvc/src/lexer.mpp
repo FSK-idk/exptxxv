@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 export module lexer;
 
 import std;
@@ -6,66 +10,146 @@ import types;
 import tokens;
 
 
+enum class Result {
+    eSuccess,
+    eError,
+    eInvalid,
+};
+
 export
 class Lexer {
 public:
-    Lexer(std::string program) : program_(std::move(program)) {}
+    Lexer(std::string program) : program_(std::move(program)), iter_(program_.begin()) {}
 
-    auto tokenize() -> void {
-        u64 size = program_.size();
+    auto lex() -> b8 {
+        while (!eof()) {
+            while (!eof() && std::isspace(*current())) ++current();
+            if (eof()) break;
 
-        u64 i = 0;
-        while (i < size) {
-            // spaces
-            while (i < size && std::isspace(program_[i])) ++i;
-            if (i == size) break;
-
-            // identifier or reserved
-            if (std::isalpha(program_[i])) {
-                u64 j = i + 1; while (j < size && std::isalnum(program_[j])) ++j;
-                std::string_view name = std::string_view{ program_.data() + i, program_.data() + j };
-                uptr_t<Token> token;
-                if      (name == "extern") { token = Token::Create(TokenType::eExtern); }
-                else if (name == "return") { token = Token::Create(TokenType::eReturn); }
-                else                       { token = uptr_cast<Token>(IdentifierToken::Create(std::string(name))); }
-                tokens_.emplace_back(std::move(token));
-                i = j; continue;
+            switch (lexIdentifierOrReserved()) {
+            case Result::eSuccess: continue;
+            case Result::eError: return false;
+            case Result::eInvalid: break;
             }
 
-            // number
-            if (std::isdigit(program_[i])) {
-                // TODO: handle multiple dots e.g. '123.123.123'
-                u64 j = i + 1; while (j < size && (std::isdigit(program_[j]) || program_[j] == '.')) ++j;
-                f64 value; std::from_chars(program_.data() + i, program_.data() + j, value);
-                tokens_.emplace_back(uptr_cast<Token>(NumberToken::Create(value)));
-                i = j; continue;
+            switch (lexNumber()) {
+            case Result::eSuccess: continue;
+            case Result::eError: return false;
+            case Result::eInvalid: break;
             }
 
-            // special
-            uptr_t<Token> token;
-            if      (program_[i] == ':') { token = Token::Create(TokenType::eColon); }
-            else if (program_[i] == ';') { token = Token::Create(TokenType::eSemicolon); }
-            else if (program_[i] == ',') { token = Token::Create(TokenType::eComma); }
-            else if (program_[i] == '(') { token = Token::Create(TokenType::eLeftRoundBracket); }
-            else if (program_[i] == ')') { token = Token::Create(TokenType::eRightRoundBracket); }
-            else if (program_[i] == '{') { token = Token::Create(TokenType::eLeftCurlyBracket); }
-            else if (program_[i] == '}') { token = Token::Create(TokenType::eRightCurlyBracket); }
-            else if (program_[i] == '+') { token = Token::Create(TokenType::ePlus); }
-            else if (program_[i] == '-') { token = Token::Create(TokenType::eMinus); }
-            else if (program_[i] == '*') { token = Token::Create(TokenType::eAsterisk); }
-            else if (program_[i] == '/') { token = Token::Create(TokenType::eSlash); }
-            else                         { token = Token::Create(TokenType::eUnknown); }
-            tokens_.emplace_back(std::move(token));
+            switch (lexSpecial()) {
+            case Result::eSuccess: continue;
+            case Result::eError: return false;
+            case Result::eInvalid: break;
+            }
 
-            ++i;
+            assert(false && "last result shouldn't be invalid");
         }
 
-        tokens_.emplace_back(Token::Create(TokenType::eEof));
+        append<Token>(TokenType::eEof);
+
+        return true;
     };
 
     auto tokens() const -> std::vector<uptr_t<Token>> const& { return tokens_; }
 
 private:
+    // identifier ::= alpha alphanum*
+    auto lexIdentifierOrReserved() -> Result {
+        if (!std::isalpha(*current())) return Result::eInvalid;
+
+        auto start = current(); while (!eof() && std::isalnum(*current())) ++current();
+        auto name = std::string_view{ start, current() };
+
+        if (name == "extern") { return append<Token>(TokenType::eExtern); }
+        if (name == "return") { return append<Token>(TokenType::eReturn); }
+        if (name == "i64")    { return append<Token>(TokenType::eI64); }
+        if (name == "i32")    { return append<Token>(TokenType::eI32); }
+        if (name == "i16")    { return append<Token>(TokenType::eI16); }
+        if (name == "u64")    { return append<Token>(TokenType::eU64); }
+        if (name == "u32")    { return append<Token>(TokenType::eU32); }
+        if (name == "u16")    { return append<Token>(TokenType::eU16); }
+        if (name == "f64")    { return append<Token>(TokenType::eF64); }
+        if (name == "f32")    { return append<Token>(TokenType::eF32); }
+        return append<IdentifierToken>(std::string(name));
+    }
+
+    // integer ::= digit+ ( 'i' | 'i16' | 'i32' | 'i64' )?
+    // unsigned ::= digit+ ( 'u' | 'u16' | 'u32' | 'u64' )
+    // floating ::= digit+ '.' digit* ( 'f' | 'f32' | 'f64' )?
+    // TODO: handle sign
+    auto lexNumber() -> Result {
+        if (!std::isdigit(*current())) return Result::eInvalid;
+
+        auto start = current(); while (!eof() && std::isdigit(*current())) ++current();
+
+        if (eof() || !std::string_view("iuf.").contains(*current())) {
+            auto value = std::string_view{ start, current() };
+            return append<IntegerToken>(std::string(value), BitSize::e64);
+        }
+
+        if (*current() == '.') {
+            ++current(); while (!eof() && std::isdigit(*current())) ++current();
+            auto value = std::string_view{ start, current() };
+
+            if (eof() || *current() != 'f')
+                return append<FloatingToken>(std::string(value), BitSize::e64);
+
+            auto start = current()++; while (!eof() && std::isdigit(*current())) ++current();
+            auto size = std::string_view{ start, current() };
+
+            if (size == "f" || size == "f64") { return append<FloatingToken>(std::string(value), BitSize::e64); }
+            if (size == "f32")                { return append<FloatingToken>(std::string(value), BitSize::e32); }
+            return error("invalid floating suffix");
+        }
+
+        auto value = std::string_view{ start, current() };
+
+        start = current()++; while (!eof() && std::isdigit(*current())) ++current();
+        auto size = std::string_view{ start, current() };
+
+        if (size == "i" || size == "i64") { return append<IntegerToken>(std::string(value), BitSize::e64); }
+        if (size == "i32")                { return append<IntegerToken>(std::string(value), BitSize::e32); }
+        if (size == "i16")                { return append<IntegerToken>(std::string(value), BitSize::e16); }
+        if (size == "u" || size == "u64") { return append<UnsignedToken>(std::string(value), BitSize::e64); }
+        if (size == "u32")                { return append<UnsignedToken>(std::string(value), BitSize::e32); }
+        if (size == "u16")                { return append<UnsignedToken>(std::string(value), BitSize::e16); }
+        if (size == "f" || size == "f64") { return append<FloatingToken>(std::string(value), BitSize::e64); }
+        if (size == "f32")                { return append<FloatingToken>(std::string(value), BitSize::e32); }
+        return error("invalid number suffix");
+    }
+
+    auto lexSpecial() -> Result {
+        auto start = current()++;
+        switch (*start) {
+        case ':': return append<Token>(TokenType::eColon);
+        case ';': return append<Token>(TokenType::eSemicolon);
+        case ',': return append<Token>(TokenType::eComma);
+        case '(': return append<Token>(TokenType::eLeftRoundBracket);
+        case ')': return append<Token>(TokenType::eRightRoundBracket);
+        case '{': return append<Token>(TokenType::eLeftCurlyBracket);
+        case '}': return append<Token>(TokenType::eRightCurlyBracket);
+        case '+': return append<Token>(TokenType::ePlus);
+        case '-': return append<Token>(TokenType::eMinus);
+        case '*': return append<Token>(TokenType::eAsterisk);
+        case '/': return append<Token>(TokenType::eSlash);
+        default: return error("unknown symbol");
+        }
+    }
+
+private:
+    auto current() -> std::string::iterator& { return iter_; }
+    auto eof() -> b8                         { return iter_ == program_.end(); }
+
+    template <class T, class... Args>
+    auto append(Args&&... args) -> Result { tokens_.emplace_back(uptr_cast<Token>(T::Create(std::forward<Args>(args)...))); return Result::eSuccess; }
+
+    template <class... Args>
+    auto error(std::format_string<Args...> fmt, Args&&... args) -> Result { std::println(fmt, std::forward<Args>(args)...); return Result::eError; }
+
+private:
     std::string program_;
+    std::string::iterator iter_;
     std::vector<uptr_t<Token>> tokens_;
 };

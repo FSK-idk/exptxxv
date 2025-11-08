@@ -9,6 +9,8 @@ import nodes;
 
 // xxv grammar
 //
+// for now number-token is floating-token
+//
 // module
 //   ::= module-statement*
 //
@@ -292,8 +294,8 @@ private:
 
             return uptr_cast<ExpressionNode>(VariableExpressionNode::Create(std::move(identifier->name)));
         }
-        if (auto number = consume<NumberToken>(TokenType::eNumber)) {
-            return uptr_cast<ExpressionNode>(NumberExpressionNode::Create(number->value));
+        if (auto number = consume<FloatingToken>(TokenType::eFloating)) {
+            return uptr_cast<ExpressionNode>(NumberExpressionNode::Create(std::stod(number->value)));
         }
 
         return uptr_cast<ExpressionNode>(EmptyExpressionNode::Create());

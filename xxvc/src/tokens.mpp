@@ -7,12 +7,22 @@ import types;
 
 export
 enum class TokenType {
-    eNumber,
     eIdentifier,
+    eInteger,
+    eUnsigned,
+    eFloating,
 
     // reserved
     eExtern,
     eReturn,
+    eI64,
+    eI32,
+    eI16,
+    eU64,
+    eU32,
+    eU16,
+    eF64,
+    eF32,
 
     // special
     eColon,
@@ -28,6 +38,13 @@ enum class TokenType {
     eSlash,
     eUnknown,
     eEof,
+};
+
+export
+enum class BitSize {
+    e16,
+    e32,
+    e64,
 };
 
 export
@@ -47,7 +64,22 @@ struct IdentifierToken : Token {
 };
 
 export
-struct NumberToken : Token {
-    static auto Create(f64 value) -> uptr_t<NumberToken>;
-    f64 value;
+struct IntegerToken : Token {
+    static auto Create(std::string value, BitSize size) -> uptr_t<IntegerToken>;
+    std::string value;
+    BitSize size;
+};
+
+export
+struct UnsignedToken : Token {
+    static auto Create(std::string value, BitSize size) -> uptr_t<UnsignedToken>;
+    std::string value;
+    BitSize size;
+};
+
+export
+struct FloatingToken : Token {
+    static auto Create(std::string value, BitSize size) -> uptr_t<FloatingToken>;
+    std::string value;
+    BitSize size;
 };

@@ -12,9 +12,14 @@ auto Token::Create(TokenType type) -> uptr_t<Token> {
 auto Token::Destroy(Token* token) -> void {
     switch (token->type) {
         case TokenType::eIdentifier:
-            SelfDestructor<IdentifierToken>{}(static_cast<IdentifierToken*>(token)); break;
-        case TokenType::eNumber:
-            SelfDestructor<NumberToken>{}(static_cast<NumberToken*>(token)); break;
+            return SelfDestructor<IdentifierToken>{}(static_cast<IdentifierToken*>(token));
+        case TokenType::eInteger:
+            return SelfDestructor<IntegerToken>{}(static_cast<IntegerToken*>(token));
+        case TokenType::eUnsigned:
+            return SelfDestructor<UnsignedToken>{}(static_cast<UnsignedToken*>(token));
+        case TokenType::eFloating:
+            return SelfDestructor<FloatingToken>{}(static_cast<FloatingToken*>(token));
+        // TODO: introduce TokenType::eSpecial and TokenType::eKeyword and add here assert as default
         default:
             delete token; break;
     }
@@ -28,11 +33,26 @@ auto IdentifierToken::Create(std::string name) -> uptr_t<IdentifierToken> {
     };
 }
 
-// NumberToken
+// IntegerToken
 
-auto NumberToken::Create(f64 value) -> uptr_t<NumberToken> {
-    return uptr_t<NumberToken>{
-        new NumberToken{ { TokenType::eNumber }, value }
+auto IntegerToken::Create(std::string value, BitSize size) -> uptr_t<IntegerToken> {
+    return uptr_t<IntegerToken> {
+        new IntegerToken { { TokenType::eInteger }, std::move(value), size }
     };
 }
 
+// UnsignedToken
+
+auto UnsignedToken::Create(std::string value, BitSize size) -> uptr_t<UnsignedToken> {
+    return uptr_t<UnsignedToken> {
+        new UnsignedToken{ { TokenType::eUnsigned }, std::move(value), size }
+    };
+}
+
+// FloatingToken
+
+auto FloatingToken::Create(std::string value, BitSize size) -> uptr_t<FloatingToken> {
+    return uptr_t<FloatingToken> {
+        new FloatingToken{ { TokenType::eFloating }, std::move(value), size }
+    };
+}

@@ -177,10 +177,6 @@ private:
             auto expression = codegen(node->expression.get());
             if (!expression) return nullptr;
 
-            auto castedExpression = builder_->CreateCast(llvm::Instruction::CastOps::FPToSI, expression, llvm::Type::getInt32Ty(*context_));
-            if (!castedExpression)
-                return error("couldn't cast expression");
-
             return builder_->CreateRet(
                 builder_->CreateCast(llvm::Instruction::CastOps::FPToSI, expression, llvm::Type::getInt32Ty(*context_)));
         }

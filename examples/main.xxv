@@ -5,10 +5,10 @@ mult2: (x) {
 };
 
 take2: () {
-    return 2;
+    return 2f;
 };
 
 main: () {
-    varb: { 4 };
-    return mult2(1) + varb;
+    varb: { 4f };
+    return mult2(1f) + varb;
 };

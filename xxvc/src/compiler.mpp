@@ -21,11 +21,14 @@ public:
 
     auto exec(std::string program, std::string const& outputFilename) -> b8 {
         Lexer lexer(std::move(program));
-        lexer.tokenize();
+        if (!lexer.lex()) {
+            std::println("failed to lex");
+            return false;
+        }
 
         Parser parser(lexer.tokens());
         if (!parser.parse()) {
-            std::println("parse failed");
+            std::println("failed to parse");
             return false;
         }
 
@@ -46,7 +49,7 @@ public:
         codegen.module()->print(os, nullptr);
 
         if (printOpt_) {
-            std::println("{:=<40}", "= input =");
+            std::println("{:=<40}", "= ir =");
             std::print("{}", output);
         }
         else {

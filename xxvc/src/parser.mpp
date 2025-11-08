@@ -9,7 +9,7 @@ import nodes;
 
 // xxv grammar
 //
-// for now number-token is floating-token
+// TODO: rewrite parser according to grammar
 //
 // module
 //   ::= module-statement*
@@ -19,60 +19,80 @@ import nodes;
 //   ::= function-definition
 //   ::= extern-function-declaration
 // function-declaration
-//   ::= function-prototype ';'
+//   ::= !function-prototype ';'
 // function-definition
-//   ::= function-prototype '{' function-statement* '}' ';'
+//   ::= !function-prototype !function-statement-block ';'
 // extern-function-declaration
-//   ::= 'extern' function-prototype ';'
-//
-// function-prototype
-//   ::= identifier-token ':' '(' ( identifier-token ( ',' identifier-token )* ','? )? ')'
+//   ::= 'extern' !function-prototype ';'
 //
 // function-statement
 //   ::= variable-declaration
 //   ::= variable-definition
 //   ::= return-statement
 // variable-declaration
-//   ::= identifier-token ';'
+//   ::= !variable-prototype ';'
 // variable-definition
-//   ::= identifier-token ':' '{' expression '}' ';'
+//   ::= !variable-prototype !expression-block ';'
 // return-statement
 //   ::= 'return' expression ';'
 //
 // expression
 //   ::= binary-expression
-//   ::= primary-expression
+//   ::= !primary-expression
 // binary-expression
-//   ::= ( primary-expression - empty-expression | binary-expression - empty-expression )
-//       binary-operator
-//       ( primary-expression - empty-expression | binary-expression - empty-expression )
-// primary-expression
-//   ::= '(' expression ')'
+//   ::= !non-empty-expression binary-operator !non-empty-expression
+// function-call-expression
+//   ::= identifier-token !non-empty-expression-list
+// variable-expression
+//   ::= identifier-token
+// number-expression
+//   ::= integer-token
+//   ::= unsigned-token
+//   ::= floating-token
+// empty-expression
+//   ::=
+//
+// binary-operator
+//   ::= '+' | '-' | '*' | '/'
+//
+//
+//
+// !function-statement-block
+//   ::= '{' function-statement* '}'
+// !expression-block
+//   ::= '{' expression '}'
+//
+// !non-empty-expression
+//   ::= binary-expression
+//   ::= !primary-expression - empty-expression
+// !primary-expression
+//   ::= '(' !non-empty-expression ')'
 //   ::= function-call-expression
 //   ::= variable-expression
 //   ::= number-expression
 //   ::= empty-expression
-// function-call-expression
-//   ::= identifier-token ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
-// variable-expression
-//   ::= identifier-token
-// number-expression
-//   ::= number-token
-// empty-expression
-//   ::=
 //
-// identifier
-//   ::= identifier-token
-// number
-//   ::= number-token
-// binary-operator
-//   ::= '+' | '-' | '*' | '/'
+// !non-empty-expression-list
+//   ::= '(' ( !non-empty-expression ( ',' !non-empty-expression )* ','? )? ')'
+//
+// !function-prototype
+//   ::= identifier-token ':' !function-type
+// !function-type
+//   ::= !variable-prototype-list '->' !primary-type
+//
+// !variable-prototype-list
+//   ::= '(' ( !variable-prototype ( ',' !variable-prototype )* ','? )? ')'
+//
+// !variable-prototype
+//   ::= identifier-token ':' !primary-type
+// !primary-type
+//   ::= 'i64' | 'i32' | 'i16' | 'u64' | 'u32' | 'u16' | 'f64' | 'f32'
 
 
 export
 class Parser {
 public:
-    Parser(std::vector<uptr_t<Token>> const& tokens)
+    Parser(std::vector<uptr_t<Token>>& tokens)
         : tokens_(tokens), moduleNode_(nullptr) {}
 
     auto parse() -> b8 {
@@ -343,7 +363,7 @@ private:
     //   ::= '+' | '-' | '*' | '/'
     auto peekBinaryOperator() -> uptr_t<BinaryOperatorNode> {
         BinaryOperatorType type;
-        switch (token()->type) {
+        switch (current()->type) {
             case TokenType::ePlus:     type = BinaryOperatorType::eAddition; break;
             case TokenType::eMinus:    type = BinaryOperatorType::eSubtraction; break;
             case TokenType::eAsterisk: type = BinaryOperatorType::eMultiplication; break;
@@ -355,11 +375,11 @@ private:
     }
 
 private:
-    auto token() -> Token* { return tokens_[tokenIndex_].get(); }
+    auto current() -> Token* { return tokens_[tokenIndex_].get(); }
     auto advance() -> void { ++tokenIndex_; }
     template <class T = Token>
     auto consume(TokenType type) -> T* {
-        if (token()->type == type) { return static_cast<T*>(tokens_[tokenIndex_++].get()); }
+        if (current()->type == type) { return static_cast<T*>(tokens_[tokenIndex_++].get()); }
         return nullptr;
     }
     template <class... Args>
@@ -369,7 +389,7 @@ private:
     }
 
 private:
-    std::vector<uptr_t<Token>> const& tokens_;
+    std::vector<uptr_t<Token>>& tokens_;
     u64 tokenIndex_;
     uptr_t<ModuleNode> moduleNode_;
 };

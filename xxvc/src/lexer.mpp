@@ -52,7 +52,7 @@ public:
         return true;
     };
 
-    auto tokens() const -> std::vector<uptr_t<Token>> const& { return tokens_; }
+    auto tokens() -> std::vector<uptr_t<Token>>& { return tokens_; }
 
 private:
     // identifier ::= alpha alphanum*

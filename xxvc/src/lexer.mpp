@@ -72,6 +72,7 @@ private:
         if (name == "u16")    { return append<Token>(TokenType::eU16); }
         if (name == "f64")    { return append<Token>(TokenType::eF64); }
         if (name == "f32")    { return append<Token>(TokenType::eF32); }
+
         return append<IdentifierToken>(std::string(name));
     }
 
@@ -134,6 +135,7 @@ private:
         case '-': return append<Token>(TokenType::eMinus);
         case '*': return append<Token>(TokenType::eAsterisk);
         case '/': return append<Token>(TokenType::eSlash);
+        case '>': return append<Token>(TokenType::eGreater);
         default: return error("unknown symbol");
         }
     }

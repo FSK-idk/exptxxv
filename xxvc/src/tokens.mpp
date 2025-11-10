@@ -36,15 +36,15 @@ enum class TokenType {
     eMinus,
     eAsterisk,
     eSlash,
-    eUnknown,
+    eGreater,
     eEof,
 };
 
 export
 enum class BitSize {
-    e16,
-    e32,
     e64,
+    e32,
+    e16,
 };
 
 export

@@ -7,6 +7,7 @@ export module printer;
 import std;
 
 import types;
+import tokens;
 import nodes;
 
 
@@ -18,8 +19,8 @@ public:
     auto print(ModuleNode* node) -> void {
         advance();
         indent(); std::println("module");
-        indent(); std::println("-body");
-        for (auto& statement : node->body) print(statement.get());
+        indent(); std::println("-stmts");
+        for (auto& stmt : node->stmts) print(stmt.get());
         retreat();
     }
 
@@ -39,37 +40,59 @@ public:
     auto print(FunctionDeclarationNode* node) -> void {
         advance();
         indent(); std::println("function-declaration");
-        indent(); std::println("-prototype");
-        print(node->prototype.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
+        indent(); std::println("-vars");
+        for (auto& [name, type] : node->vars) {
+            advance();
+            indent(); std::println("-name");
+            print("{}", name);
+            indent(); std::println("-type");
+            print(type);
+            retreat();
+        }
+        indent(); std::println("-retType");
+        print(node->retType);
         retreat();
     }
 
     auto print(FunctionDefinitionNode* node) -> void {
         advance();
         indent(); std::println("function-definition");
-        indent(); std::println("-prototype");
-        print(node->prototype.get());
-        indent(); std::println("-body");
-        for (auto& statement : node->body) print(statement.get());
+        indent(); std::println("-name");
+        print("{}", node->name);
+        indent(); std::println("-vars");
+        for (auto& [name, type] : node->vars) {
+            advance();
+            indent(); std::println("-name");
+            print("{}", name);
+            indent(); std::println("-type");
+            print(type);
+            retreat();
+        }
+        indent(); std::println("-retType");
+        print(node->retType);
+        indent(); std::println("-stmts");
+        for (auto& stmt: node->stmts) print(stmt.get());
         retreat();
     }
 
     auto print(ExternFunctionDeclarationNode* node) -> void {
         advance();
         indent(); std::println("extern-function-declaration");
-        indent(); std::println("-prototype");
-        print(node->prototype.get());
-        retreat();
-    }
-
-    auto print(FunctionPrototypeNode* node) -> void {
-        advance();
-        indent(); std::println("function-prototype");
-        indent(); std::println("-identifier");
         indent(); std::println("-name");
         print("{}", node->name);
-        indent(); std::println("-args");
-        for (auto& arg : node->args) print("{}", arg);
+        indent(); std::println("-vars");
+        for (auto& [name, type] : node->vars) {
+            advance();
+            indent(); std::println("-name");
+            print("{}", name);
+            indent(); std::println("-type");
+            print(type);
+            retreat();
+        }
+        indent(); std::println("-retType");
+        print(node->retType);
         retreat();
     }
 
@@ -91,6 +114,8 @@ public:
         indent(); std::println("variable-declaration");
         indent(); std::println("-name");
         print("{}", node->name);
+        indent(); std::println("-type");
+        print(node->type);
         retreat();
     }
 
@@ -99,16 +124,18 @@ public:
         indent(); std::println("variable-declaration");
         indent(); std::println("-name");
         print("{}", node->name);
-        indent(); std::println("-expression");
-        print(node->expression.get());
+        indent(); std::println("-type");
+        print(node->type);
+        indent(); std::println("-expr");
+        print(node->expr.get());
         retreat();
     }
 
     auto print(ReturnStatementNode* node) -> void {
         advance();
         indent(); std::println("return-statement");
-        indent(); std::println("-expression");
-        print(node->expression.get());
+        indent(); std::println("-expr");
+        print(node->expr.get());
         retreat();
     }
 
@@ -120,8 +147,12 @@ public:
             return print(static_cast<FunctionCallExpressionNode*>(node));
         case ExpressionType::eVariableExpression:
             return print(static_cast<VariableExpressionNode*>(node));
-        case ExpressionType::eNumberExpression:
-            return print(static_cast<NumberExpressionNode*>(node));
+        case ExpressionType::eIntegerExpression:
+            return print(static_cast<IntegerExpressionNode*>(node));
+        case ExpressionType::eUnsignedExpression:
+            return print(static_cast<UnsignedExpressionNode*>(node));
+        case ExpressionType::eFloatingExpression:
+            return print(static_cast<FloatingExpressionNode*>(node));
         case ExpressionType::eEmptyExpression:
             return print(static_cast<EmptyExpressionNode*>(node));
         default:
@@ -132,8 +163,8 @@ public:
     auto print(BinaryExpressionNode* node) -> void {
         advance();
         indent(); std::println("binary-expression");
-        indent(); std::println("-binary-operator");
-        print(node->binaryOperator.get());
+        indent(); std::println("-opType");
+        print(node->opType);
         indent(); std::println("-lhs");
         print(node->lhs.get());
         indent(); std::println("-rhs");
@@ -146,8 +177,8 @@ public:
         indent(); std::println("function-call-expression");
         indent(); std::println("-name");
         print("{}", node->name);
-        indent(); std::println("-args");
-        for (auto& arg : node->args) print(arg.get());
+        indent(); std::println("-exprs");
+        for (auto& arg : node->exprs) print(arg.get());
         retreat();
     }
 
@@ -159,11 +190,33 @@ public:
         retreat();
     }
 
-    auto print(NumberExpressionNode* node) -> void {
+    auto print(IntegerExpressionNode* node) -> void {
         advance();
-        indent(); std::println("number-expression");
+        indent(); std::println("integer-expression");
         indent(); std::println("-value");
         print("{}", node->value);
+        indent(); std::println("-size");
+        print(node->size);
+        retreat();
+    }
+
+    auto print(UnsignedExpressionNode* node) -> void {
+        advance();
+        indent(); std::println("unsigned-expression");
+        indent(); std::println("-value");
+        print("{}", node->value);
+        indent(); std::println("-size");
+        print(node->size);
+        retreat();
+    }
+
+    auto print(FloatingExpressionNode* node) -> void {
+        advance();
+        indent(); std::println("floating-expression");
+        indent(); std::println("-value");
+        print("{}", node->value);
+        indent(); std::println("-size");
+        print(node->size);
         retreat();
     }
 
@@ -173,31 +226,52 @@ public:
         retreat();
     }
 
-    auto print(BinaryOperatorNode* node) -> void {
+private:
+    auto print(PrimaryTypeType type) -> void {
         advance();
-        indent(); std::println("binary-operator");
-        indent(); std::println("-type");
-        advance();
-        switch (node->type) {
-        case BinaryOperatorType::eAddition:
-            indent(); std::println("addition"); break;
-        case BinaryOperatorType::eSubtraction:
-            indent(); std::println("subtraction"); break;
-        case BinaryOperatorType::eMultiplication:
-            indent(); std::println("multiplication"); break;
-        case BinaryOperatorType::eDivision:
-            indent(); std::println("division"); break;
+        indent();
+        switch (type) {
+        case PrimaryTypeType::eI64: std::println("i64"); break;
+        case PrimaryTypeType::eI32: std::println("i32"); break;
+        case PrimaryTypeType::eI16: std::println("i16"); break;
+        case PrimaryTypeType::eU64: std::println("u64"); break;
+        case PrimaryTypeType::eU32: std::println("u32"); break;
+        case PrimaryTypeType::eU16: std::println("u16"); break;
+        case PrimaryTypeType::eF64: std::println("f64"); break;
+        case PrimaryTypeType::eF32: std::println("f32"); break;
         default:
             assert(false && "add case");
         }
         retreat();
+    }
+
+    auto print(BinaryOperatorType type) -> void {
+        advance();
+        indent();
+        switch (type) {
+        case BinaryOperatorType::eAddition:       std::println("addition"); break;
+        case BinaryOperatorType::eSubtraction:    std::println("subtraction"); break;
+        case BinaryOperatorType::eMultiplication: std::println("multiplication"); break;
+        case BinaryOperatorType::eDivision:       std::println("division"); break;
+        default:
+            assert(false && "add case");
+        }
         retreat();
     }
 
-private:
-    auto indent() -> void { std::print("{}", std::string(space_, ' ')); }
-    auto advance() -> void { space_ += step_; }
-    auto retreat() -> void { space_ -= step_; }
+    auto print(BitSize size) -> void {
+        advance();
+        indent();
+        switch (size) {
+        case BitSize::e64: std::println("64"); break;
+        case BitSize::e32: std::println("32"); break;
+        case BitSize::e16: std::println("16"); break;
+        default:
+            assert(false && "add case");
+        }
+        retreat();
+    }
+
     template <class... Args>
     auto print(std::format_string<Args...> fmt, Args&&... args) -> void {
         advance();
@@ -205,6 +279,10 @@ private:
         retreat();
     }
 
+private:
+    auto indent() -> void { std::print("{}", std::string(space_, ' ')); }
+    auto advance() -> void { space_ += step_; }
+    auto retreat() -> void { space_ -= step_; }
 
 private:
     u64 step_;

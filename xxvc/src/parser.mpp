@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 export module parser;
 
 import std;
@@ -9,7 +13,6 @@ import nodes;
 
 // xxv grammar
 //
-// TODO: rewrite parser according to grammar
 //
 // module
 //   ::= module-statement*
@@ -38,6 +41,7 @@ import nodes;
 //
 // expression
 //   ::= binary-expression
+//   ::= !non-empty-expression
 //   ::= !primary-expression
 // binary-expression
 //   ::= !non-empty-expression binary-operator !non-empty-expression
@@ -45,16 +49,14 @@ import nodes;
 //   ::= identifier-token !non-empty-expression-list
 // variable-expression
 //   ::= identifier-token
-// number-expression
+// integer-expression
 //   ::= integer-token
+// unsigned-expression
 //   ::= unsigned-token
+// floating-expression
 //   ::= floating-token
 // empty-expression
 //   ::=
-//
-// binary-operator
-//   ::= '+' | '-' | '*' | '/'
-//
 //
 //
 // !function-statement-block
@@ -62,18 +64,22 @@ import nodes;
 // !expression-block
 //   ::= '{' expression '}'
 //
+// !non-empty-expression-list
+//   ::= '(' ( !non-empty-expression ( ',' !non-empty-expression )* ','? )? ')'
+//
 // !non-empty-expression
-//   ::= binary-expression
-//   ::= !primary-expression - empty-expression
+//   ::= expression - empty-expression
 // !primary-expression
 //   ::= '(' !non-empty-expression ')'
 //   ::= function-call-expression
 //   ::= variable-expression
-//   ::= number-expression
+//   ::= integer-expression
+//   ::= unsigned-expression
+//   ::= floating-expression
 //   ::= empty-expression
 //
-// !non-empty-expression-list
-//   ::= '(' ( !non-empty-expression ( ',' !non-empty-expression )* ','? )? ')'
+// !binary-operator
+//   ::= '+' | '-' | '*' | '/'
 //
 // !function-prototype
 //   ::= identifier-token ':' !function-type
@@ -93,10 +99,9 @@ export
 class Parser {
 public:
     Parser(std::vector<uptr_t<Token>>& tokens)
-        : tokens_(tokens), moduleNode_(nullptr) {}
+        : tokens_(tokens), iter_(tokens_.begin()), moduleNode_(nullptr), currentFunctionName_("") {}
 
     auto parse() -> b8 {
-        tokenIndex_ = 0;
         moduleNode_ = parseModule();
         return moduleNode_ != nullptr;
     }
@@ -107,16 +112,16 @@ private:
     // module
     //   ::= module-statement*
     auto parseModule() -> uptr_t<ModuleNode> {
-        std::vector<uptr_t<ModuleStatementNode>> body;
-        while (true) {
-            if (consume(TokenType::eEof)) break;
+        std::vector<uptr_t<ModuleStatementNode>> stmts;
 
-            auto statement = parseModuleStatement();
-            if (!statement) return nullptr;
-            body.emplace_back(std::move(statement));
+        while (!consume(TokenType::eEof)) {
+            auto stmt = parseModuleStatement();
+            if (!stmt) return nullptr;
+
+            stmts.emplace_back(std::move(stmt));
         }
 
-        return ModuleNode::Create(std::move(body));
+        return ModuleNode::Create(std::move(stmts));
     }
 
     // module-statement
@@ -124,59 +129,200 @@ private:
     //   ::= function-definition
     //   ::= extern-function-declaration
     // function-declaration
-    //   ::= function-prototype ';'
+    //   ::= !function-prototype ';'
     // function-definition
-    //   ::= function-prototype '{' function-statement* '}' ';'
+    //   ::= !function-prototype !function-statement-block ';'
     // extern-function-declaration
-    //   ::= 'extern' function-prototype ';'
+    //   ::= 'extern' !function-prototype ';'
     auto parseModuleStatement() -> uptr_t<ModuleStatementNode> {
         b8 isExtern = false;
         if (consume(TokenType::eExtern)) isExtern = true;
 
-        auto prototype = parseFunctionPrototype();
-        if (!prototype) return nullptr;
-        if (consume(TokenType::eSemicolon))
-            return isExtern 
-                ? uptr_cast<ModuleStatementNode>(ExternFunctionDeclarationNode::Create(std::move(prototype)))
-                : uptr_cast<ModuleStatementNode>(FunctionDeclarationNode::Create(std::move(prototype)));
+        auto proto = parseFunctionPrototype();
+        if (!proto) return nullptr;
 
-        if (!consume(TokenType::eLeftCurlyBracket))
-            return error("expected left curly bracket");
-
-        std::vector<uptr_t<FunctionStatementNode>> body;
-        while (true) {
-            if (consume(TokenType::eRightCurlyBracket)) break;
-
-            auto statement = parseFunctionStatement();
-            if (!statement) return nullptr;
-            body.emplace_back(std::move(statement));
+        if (functionRetType_.contains(proto->name)) {
+            if (functionRetType_[proto->name] != proto->retType)
+                return error("incorrect return type");
         }
+        else {
+            functionRetType_[proto->name] = proto->retType;
+        }
+
+        if (consume(TokenType::eSemicolon)) {
+            if (isExtern) return ExternFunctionDeclarationNode::Create(std::move(proto));
+            else return FunctionDeclarationNode::Create(std::move(proto));
+        }
+
+        currentFunctionName_ = proto->name;
+        for (auto [name, type] : proto->vars)
+            variableType_[name] = type;
+
+        auto block = parseFunctionStatementBlock();
+        if (!block) return nullptr;
 
         if (!consume(TokenType::eSemicolon))
             return error("expected semicolon");
 
-        return uptr_cast<ModuleStatementNode>(FunctionDefinitionNode::Create(std::move(prototype), std::move(body)));
+        currentFunctionName_ = "";
+        variableType_.clear();
+
+        return FunctionDefinitionNode::Create(std::move(proto), std::move(block));
     }
 
-    // function-prototype
-    //   ::= identifier-token ':' '(' ( identifier-token ( ',' identifier-token )* ','? )? ')'
-    auto parseFunctionPrototype() -> uptr_t<FunctionPrototypeNode> {
-        auto identifier = consume<IdentifierToken>(TokenType::eIdentifier);
-        if (!identifier)
-            return error("expected identifier");
+    // function-statement
+    //   ::= variable-declaration
+    //   ::= variable-definition
+    //   ::= return-statement
+    // variable-declaration
+    //   ::= !variable-prototype ';'
+    // variable-definition
+    //   ::= !variable-prototype !expression-block ';'
+    // return-statement
+    //   ::= 'return' expression ';'
+    auto parseFunctionStatement() -> uptr_t<FunctionStatementNode> {
+        if (current()->type == TokenType::eIdentifier) {
+            auto proto = parseVariablePrototype();
+            if (!proto) return nullptr;
 
-        if (!consume(TokenType::eColon))
-            return error("expected colon");
-        
+            if (consume(TokenType::eSemicolon)) {
+                variableType_[proto->name] = proto->type;
+
+                return VariableDeclarationNode::Create(std::move(proto));
+            }
+            
+            auto block = parseExpressionBlock();
+            if (!block) return nullptr;
+
+            if (!consume(TokenType::eSemicolon))
+                return error("expected semicolon");
+
+            if (variableType_.contains(proto->name)) {
+                if (variableType_[proto->name] != proto->type)
+                    return error("incorrect variable type");
+            }
+            else {
+                variableType_[proto->name] = proto->type;
+            }
+
+            return VariableDefinitionNode::Create(std::move(proto), std::move(block));
+        }
+        if (consume(TokenType::eReturn)) {
+            auto expr = parseExpression();
+            if (!expr) return nullptr;
+
+            if (!consume(TokenType::eSemicolon))
+                return error("expected semicolon");
+
+            if (functionRetType_[currentFunctionName_] == PrimaryTypeType::eVoid && expr->retType != PrimaryTypeType::eVoid)
+                return error("void function shouldn't return value");
+
+            return ReturnStatementNode::Create(functionRetType_[currentFunctionName_], std::move(expr));
+        }
+
+        return error("expected function statement");
+    }
+
+    // expression
+    //   ::= binary-expression
+    //   ::= !non-empty-expression
+    //   ::= !primary-expression
+    auto parseExpression() -> uptr_t<ExpressionNode> {
+        auto pexpr = parsePrimaryExpression();
+        if (!pexpr) return nullptr;
+
+        auto expr = ExpressionNode::Create(std::move(pexpr));
+
+        if (expr->type == ExpressionType::eEmptyExpression) {
+            return expr;
+        }
+
+        auto nexpr = NonEmptyExpressionSeminode::Create(std::move(expr));
+
+        nexpr = parseBinaryExpressionRhs(0, std::move(nexpr));
+        if (!nexpr) return nullptr;
+
+        return ExpressionNode::Create(std::move(nexpr));
+    }
+
+    // binary-expression
+    //   ::= !non-empty-expression binary-operator !non-empty-expression
+    auto parseBinaryExpressionRhs(u64 prec, uptr_t<NonEmptyExpressionSeminode> lhs) -> uptr_t<NonEmptyExpressionSeminode> {
+        static std::map<BinaryOperatorType, i32> precedence = {
+            { BinaryOperatorType::eAddition,       1 },
+            { BinaryOperatorType::eSubtraction,    1 },
+            { BinaryOperatorType::eMultiplication, 2 },
+            { BinaryOperatorType::eDivision,       2 },
+        };
+
+        while (true) {
+            auto op = peekBinaryOperator();
+            if (!op) return lhs;
+
+            if (prec > precedence[op->type]) return lhs;
+            ++current();
+
+            auto rhs = parseNonEmptyExpression();
+            if (!rhs) return nullptr;
+
+            auto nextOp = peekBinaryOperator();
+            if (nextOp && precedence[op->type] < precedence[nextOp->type]) {
+                rhs = parseBinaryExpressionRhs(precedence[nextOp->type], std::move(rhs));
+                if (!rhs) return nullptr;
+            }
+
+            lhs = NonEmptyExpressionSeminode::Create(
+                BinaryExpressionNode::Create(commonType(lhs->expr->retType, rhs->expr->retType), std::move(op), std::move(lhs), std::move(rhs)));
+        }
+    }
+
+private:
+    // !function-statement-block
+    //   ::= '{' function-statement* '}'
+    auto parseFunctionStatementBlock() -> uptr_t<FunctionStatementBlockSeminode> {
+        if (!consume(TokenType::eLeftCurlyBracket))
+            return error("expected left curly bracket");
+
+        std::vector<uptr_t<FunctionStatementNode>> stmts;
+
+        while (!consume(TokenType::eRightCurlyBracket)) {
+            auto stmt = parseFunctionStatement();
+            if (!stmt) return nullptr;
+
+            stmts.emplace_back(std::move(stmt));
+        }
+
+        return FunctionStatementBlockSeminode::Create(std::move(stmts));
+    }
+
+    // !expression-block
+    //   ::= '{' expression '}'
+    auto parseExpressionBlock() -> uptr_t<ExpressionBlockSeminode> {
+        if (!consume(TokenType::eLeftCurlyBracket))
+            return error("expected left curly bracket");
+
+        auto expr = parseExpression();
+        if (!expr) return nullptr;
+
+        if (!consume(TokenType::eRightCurlyBracket))
+            return error("expected right curly bracket");
+
+        return ExpressionBlockSeminode::Create(std::move(expr));
+    }
+
+    // !non-empty-expression-list
+    //   ::= '(' ( !non-empty-expression ( ',' !non-empty-expression )* ','? )? ')'
+    auto parseNonEmptyExpressionList() -> uptr_t<NonEmptyExpressionListSeminode> {
         if (!consume(TokenType::eLeftRoundBracket))
             return error("expected left round bracket");
 
-        std::vector<std::string> args;
+        std::vector<uptr_t<NonEmptyExpressionSeminode>> exprs;
+
         if (!consume(TokenType::eRightRoundBracket)) {
-            auto identifier = consume<IdentifierToken>(TokenType::eIdentifier);
-            if (!identifier)
-                return error("expected identifier");
-            args.emplace_back(std::move(identifier->name));
+            auto expr = parseNonEmptyExpression();
+            if (!expr) return nullptr;
+
+            exprs.emplace_back(std::move(expr));
 
             while (true) {
                 if (consume(TokenType::eRightRoundBracket)) break;
@@ -186,202 +332,268 @@ private:
 
                 if (consume(TokenType::eRightRoundBracket)) break;
 
-                auto identifier = consume<IdentifierToken>(TokenType::eIdentifier);
-                if (!identifier)
-                    return error("expected identifier");
-                args.emplace_back(std::move(identifier->name));
+                auto expr = parseNonEmptyExpression();
+                if (!expr) return nullptr;
+
+                exprs.emplace_back(std::move(expr));
             }
         }
 
-        return FunctionPrototypeNode::Create(std::move(identifier->name), std::move(args));
+        return NonEmptyExpressionListSeminode::Create(std::move(exprs));
     }
 
-    // function-statement
-    //   ::= variable-declaration
-    //   ::= variable-definition
-    //   ::= return-statement
-    // variable-declaration
-    //   ::= identifier-token ';'
-    // variable-definition
-    //   ::= identifier-token ':' '{' expression '}' ';'
-    // return-statement
-    //   ::= 'return' expression ';'
-    auto parseFunctionStatement() -> uptr_t<FunctionStatementNode> {
-        if (auto identifier = consume<IdentifierToken>(TokenType::eIdentifier)) {
-            if (consume(TokenType::eSemicolon))
-                return uptr_cast<FunctionStatementNode>(VariableDeclarationNode::Create(std::move(identifier->name)));
+    // !non-empty-expression
+    //   ::= expression - empty-expression
+    auto parseNonEmptyExpression() -> uptr_t<NonEmptyExpressionSeminode> {
+        auto expr = parseExpression();
+        if (!expr) return nullptr;
 
-            if (!consume(TokenType::eColon))
-                return error("expected colon");
+        if (expr->type == ExpressionType::eEmptyExpression)
+            return error("expected non-empty expression");
 
-            if (!consume(TokenType::eLeftCurlyBracket))
-                return error("expected left curly bracket");
-
-            auto expression = parseExpression();
-            if (!expression) return nullptr;
-
-            if (!consume(TokenType::eRightCurlyBracket))
-                return error("expected right curly bracket");
-
-            if (!consume(TokenType::eSemicolon))
-                return error("expected semicolon");
-
-            return uptr_cast<FunctionStatementNode>(VariableDefinitionNode::Create(std::move(identifier->name), std::move(expression)));
-        }
-        else if (consume(TokenType::eReturn)) {
-            auto expression = parseExpression();
-            if (!expression) return nullptr;
-
-            if (!consume(TokenType::eSemicolon))
-                return error("expected semicolon");
-
-            return uptr_cast<FunctionStatementNode>(ReturnStatementNode::Create(std::move(expression)));
-        }
-
-        return error("expected function statement");
-    };
-
-    // expression
-    //   ::= binary-expression
-    //   ::= primary-expression
-    auto parseExpression() -> uptr_t<ExpressionNode> {
-        auto expression = parsePrimaryExpression();
-        if (!expression) return nullptr;
-
-        if (expression->type == ExpressionType::eEmptyExpression) return expression;
-
-        expression = parseBinaryExpressionRhs(0, std::move(expression));
-        if (!expression) return nullptr;
-
-        return expression;
+        return NonEmptyExpressionSeminode::Create(std::move(expr));
     }
 
-    // primary-expression
-    //   ::= '(' expression ')'
+    // !primary-expression
+    //   ::= '(' !non-empty-expression ')'
     //   ::= function-call-expression
     //   ::= variable-expression
-    //   ::= number-expression
+    //   ::= integer-expression
+    //   ::= unsigned-expression
+    //   ::= floating-expression
     //   ::= empty-expression
     // function-call-expression
-    //   ::= identifier-token ':' '(' ( expression - empty-expression ( ',' expression - empty-expression )* ','? )? ')'
+    //   ::= identifier-token !non-empty-expression-list
     // variable-expression
     //   ::= identifier-token
-    // number-expression
-    //   ::= number-token
+    // integer-expression
+    //   ::= integer-token
+    // unsigned-expression
+    //   ::= unsigned-token
+    // floating-expression
+    //   ::= floating-token
     // empty-expression
     //   ::=
-    auto parsePrimaryExpression() -> uptr_t<ExpressionNode> {
+    auto parsePrimaryExpression() -> uptr_t<PrimaryExpressionSeminode> {
         if (consume(TokenType::eLeftRoundBracket)) {
-            auto expression = parseExpression();
-            if (!expression) return nullptr;
+            auto expr = parseNonEmptyExpression();
+            if (!expr) return nullptr;
 
             if (!consume(TokenType::eRightRoundBracket))
                 return error("expected right round bracket");
-
-            return expression;
+            
+            return PrimaryExpressionSeminode::Create(std::move(expr));
         }
-        if (auto identifier = consume<IdentifierToken>(TokenType::eIdentifier)) {
-            if (consume(TokenType::eLeftRoundBracket)) {
-                std::vector<uptr_t<ExpressionNode>> args;
-                if (!consume(TokenType::eRightRoundBracket)) {
-                    auto expression = parseExpression();
-                    if (!expression) return nullptr;
+        if (current()->type == TokenType::eIdentifier) {
+            auto token = uptr_cast<IdentifierToken>(std::move(*current()++));
+            
+            if (current()->type != TokenType::eLeftRoundBracket) {
+                if (!variableType_.contains(token->name))
+                    return error("variable not found");
 
-                    if (expression->type == ExpressionType::eEmptyExpression)
-                        return error("expected non-empty expression");
+                auto expr = VariableExpressionNode::Create(variableType_[token->name], std::move(token->name));
 
-                    args.emplace_back(std::move(expression));
-                    while (true) {
-                        if (consume(TokenType::eRightRoundBracket)) break;
-
-                        if (!consume(TokenType::eComma))
-                            return error("expected comma");
-
-                        if (consume(TokenType::eRightRoundBracket)) break;
-
-                        auto expression = parseExpression();
-                        if (!expression) return nullptr;
-
-                        if (expression->type == ExpressionType::eEmptyExpression)
-                            return error("expected non-empty expression");
-
-                        args.emplace_back(std::move(expression));
-                    }
-                }
-
-                return uptr_cast<ExpressionNode>(FunctionCallExpressionNode::Create(std::move(identifier->name), std::move(args)));
+                return PrimaryExpressionSeminode::Create(std::move(expr));
             }
 
-            return uptr_cast<ExpressionNode>(VariableExpressionNode::Create(std::move(identifier->name)));
+            auto list = parseNonEmptyExpressionList();
+            if (!list) return nullptr;
+
+            if (!functionRetType_.contains(token->name))
+                return error("function not found");
+
+            auto expr = FunctionCallExpressionNode::Create(functionRetType_[token->name], std::move(token->name), std::move(list));
+
+            return PrimaryExpressionSeminode::Create(std::move(expr));
         }
-        if (auto number = consume<FloatingToken>(TokenType::eFloating)) {
-            return uptr_cast<ExpressionNode>(NumberExpressionNode::Create(std::stod(number->value)));
+        if (current()->type == TokenType::eInteger) {
+            auto token = uptr_cast<IntegerToken>(std::move(*current()++));
+
+            auto expr = IntegerExpressionNode::Create(std::move(token->value), token->size);
+
+            return PrimaryExpressionSeminode::Create(std::move(expr));
+        }
+        if (current()->type == TokenType::eUnsigned) {
+            auto token = uptr_cast<UnsignedToken>(std::move(*current()++));
+
+            auto expr = UnsignedExpressionNode::Create(std::move(token->value), token->size);
+
+            return PrimaryExpressionSeminode::Create(std::move(expr));
+        }
+        if (current()->type == TokenType::eFloating) {
+            auto token = uptr_cast<FloatingToken>(std::move(*current()++));
+
+            auto expr = FloatingExpressionNode::Create(std::move(token->value), token->size);
+
+            return PrimaryExpressionSeminode::Create(std::move(expr));
         }
 
-        return uptr_cast<ExpressionNode>(EmptyExpressionNode::Create());
+        auto expr = EmptyExpressionNode::Create();
+
+        return PrimaryExpressionSeminode::Create(std::move(expr));
     }
 
-    // binary-expression
-    //   ::= ( primary-expression - empty-expression | binary-expression - empty-expression )
-    //       binary-operator
-    //       ( primary-expression - empty-expression | binary-expression - empty-expression )
-    auto parseBinaryExpressionRhs(u64 currentPrecedence, uptr_t<ExpressionNode> lhs) -> uptr_t<ExpressionNode> {
-        static std::map<BinaryOperatorType, i32> precedence = {
-            { BinaryOperatorType::eAddition,       1 },
-            { BinaryOperatorType::eSubtraction,    1 },
-            { BinaryOperatorType::eMultiplication, 2 },
-            { BinaryOperatorType::eDivision,       2 },
-        };
-
-        while (true) {
-            auto binaryOperator = peekBinaryOperator();
-            if (!binaryOperator) return lhs;
-            if (currentPrecedence > precedence[binaryOperator->type]) return lhs;
-            advance();
-
-            auto rhs = parsePrimaryExpression();
-            if (!rhs) return nullptr;
-
-            if (rhs->type == ExpressionType::eEmptyExpression)
-                return error("expected non-empty expression");
-
-            auto nextBinaryOperator = peekBinaryOperator();
-            if (nextBinaryOperator && precedence[binaryOperator->type] < precedence[nextBinaryOperator->type]) {
-                rhs = parseBinaryExpressionRhs(precedence[nextBinaryOperator->type], std::move(rhs));
-                if (!rhs) return nullptr;
-
-                if (rhs->type == ExpressionType::eEmptyExpression)
-                    return error("expected non-empty expression");
-
-            }
-
-            lhs = uptr_cast<ExpressionNode>(BinaryExpressionNode::Create(std::move(binaryOperator), std::move(lhs), std::move(rhs)));
-        }
-    }
-
-    // binary-operator
+    // !binary-operator
     //   ::= '+' | '-' | '*' | '/'
-    auto peekBinaryOperator() -> uptr_t<BinaryOperatorNode> {
+    auto peekBinaryOperator() -> uptr_t<BinaryOperatorSeminode> {
         BinaryOperatorType type;
         switch (current()->type) {
             case TokenType::ePlus:     type = BinaryOperatorType::eAddition; break;
             case TokenType::eMinus:    type = BinaryOperatorType::eSubtraction; break;
             case TokenType::eAsterisk: type = BinaryOperatorType::eMultiplication; break;
             case TokenType::eSlash:    type = BinaryOperatorType::eDivision; break;
-            default:
-                return nullptr;
+            default:                   return nullptr;
         }
-        return BinaryOperatorNode::Create(type);
+        return BinaryOperatorSeminode::Create(type);
+    }
+
+    // !function-prototype
+    //   ::= identifier-token ':' !function-type
+    auto parseFunctionPrototype() -> uptr_t<FunctionPrototypeSeminode> {
+        if (current()->type != TokenType::eIdentifier)
+            return error("expected identifier");
+
+        auto token = uptr_cast<IdentifierToken>(std::move(*current()++));
+
+        if (!consume(TokenType::eColon))
+            return error("expected colon");
+
+        auto type = parseFunctionType();
+        if (!type) return nullptr;
+
+        return FunctionPrototypeSeminode::Create(std::move(token->name), std::move(type));
+    }
+
+    // !function-type
+    //   ::= !variable-prototype-list '->' !primary-type
+    auto parseFunctionType() -> uptr_t<FunctionTypeSeminode> {
+        auto list = parseVariablePrototypeList();
+        if (!list) return nullptr;
+
+        if (!consume(TokenType::eMinus))
+            return error("expected minus");
+
+        if (!consume(TokenType::eGreater))
+            return error("expected greater");
+
+        auto type = parsePrimaryType();
+        if (!type) return nullptr;
+
+        return FunctionTypeSeminode::Create(std::move(list), std::move(type));
+    }
+
+    // !variable-prototype-list
+    //   ::= '(' ( !variable-prototype ( ',' !variable-prototype )* ','? )? ')'
+    auto parseVariablePrototypeList() -> uptr_t<VariablePrototypeListSeminode> {
+        if (!consume(TokenType::eLeftRoundBracket))
+            return error("expected left round bracket");
+
+        std::vector<uptr_t<VariablePrototypeSeminode>> protos;
+
+        if (!consume(TokenType::eRightRoundBracket)) {
+            auto proto = parseVariablePrototype();
+            if (!proto) return nullptr;
+
+            protos.emplace_back(std::move(proto));
+
+            while (true) {
+                if (consume(TokenType::eRightRoundBracket)) break;
+
+                if (!consume(TokenType::eComma))
+                    return error("expected comma");
+
+                if (consume(TokenType::eRightRoundBracket)) break;
+
+                auto proto = parseVariablePrototype();
+                if (!proto) return nullptr;
+
+                protos.emplace_back(std::move(proto));
+            }
+        }
+
+        return VariablePrototypeListSeminode::Create(std::move(protos));
+    }
+
+    // !variable-prototype
+    //   ::= identifier-token ':' !primary-type
+    auto parseVariablePrototype() -> uptr_t<VariablePrototypeSeminode> {
+        if (current()->type != TokenType::eIdentifier)
+            return error("expected identifier");
+
+        auto token = uptr_cast<IdentifierToken>(std::move(*current()++));
+        
+        if (!consume(TokenType::eColon))
+            return error("expected colon");
+
+        auto type = parsePrimaryType();
+        if (!type) return nullptr;
+
+        return VariablePrototypeSeminode::Create(std::move(token->name), std::move(type));
+    }
+
+    // !primary-type
+    //   ::= 'i64' | 'i32' | 'i16' | 'u64' | 'u32' | 'u16' | 'f64' | 'f32'
+    auto parsePrimaryType() -> uptr_t<PrimaryTypeSeminode> {
+        PrimaryTypeType type;
+        switch (current()->type) {
+        case TokenType::eI64: type = PrimaryTypeType::eI64; break;
+        case TokenType::eI32: type = PrimaryTypeType::eI32; break;
+        case TokenType::eI16: type = PrimaryTypeType::eI16; break;
+        case TokenType::eU64: type = PrimaryTypeType::eU64; break;
+        case TokenType::eU32: type = PrimaryTypeType::eU32; break;
+        case TokenType::eU16: type = PrimaryTypeType::eU16; break;
+        case TokenType::eF64: type = PrimaryTypeType::eF64; break;
+        case TokenType::eF32: type = PrimaryTypeType::eF32; break;
+        default:              return error("expected primary type");
+        }
+        ++current();
+        return PrimaryTypeSeminode::Create(type);
+    }
+
+    // TODO: create separate module
+    auto commonType(PrimaryTypeType lhs, PrimaryTypeType rhs) -> PrimaryTypeType {
+        if (lhs == PrimaryTypeType::eF64 || rhs == PrimaryTypeType::eF64) return PrimaryTypeType::eF64;
+        if (lhs == PrimaryTypeType::eF32 || rhs == PrimaryTypeType::eF32) return PrimaryTypeType::eF32;
+        if (lhs == PrimaryTypeType::eI64 || rhs == PrimaryTypeType::eI64) return PrimaryTypeType::eI64;
+
+        BitSize size;
+        if      (lhs == PrimaryTypeType::eI64 || rhs == PrimaryTypeType::eI64 ||
+                 lhs == PrimaryTypeType::eU64 || rhs == PrimaryTypeType::eU64) size = BitSize::e64;
+        else if (lhs == PrimaryTypeType::eI32 || rhs == PrimaryTypeType::eI32 ||
+                 lhs == PrimaryTypeType::eU32 || rhs == PrimaryTypeType::eU32) size = BitSize::e32;
+        else if (lhs == PrimaryTypeType::eI16 || rhs == PrimaryTypeType::eI16 ||
+                 lhs == PrimaryTypeType::eU16 || rhs == PrimaryTypeType::eU16) size = BitSize::e16;
+        else {
+            assert(false && "should be integer or unsigned");
+        }
+
+        b8 isInteger = lhs == PrimaryTypeType::eI64 || rhs == PrimaryTypeType::eI64 ||
+                       lhs == PrimaryTypeType::eI32 || rhs == PrimaryTypeType::eI32 ||
+                       lhs == PrimaryTypeType::eI16 || rhs == PrimaryTypeType::eI16;
+
+        if (isInteger) {
+            switch (size) {
+            case BitSize::e64: return PrimaryTypeType::eI64;
+            case BitSize::e32: return PrimaryTypeType::eI32;
+            case BitSize::e16: return PrimaryTypeType::eI16;
+            default:
+                assert(false && "add case");
+            }
+        }
+
+        switch (size) {
+        case BitSize::e64: return PrimaryTypeType::eU64;
+        case BitSize::e32: return PrimaryTypeType::eU32;
+        case BitSize::e16: return PrimaryTypeType::eU16;
+        default:
+            assert(false && "add case");
+        }
     }
 
 private:
-    auto current() -> Token* { return tokens_[tokenIndex_].get(); }
-    auto advance() -> void { ++tokenIndex_; }
-    template <class T = Token>
-    auto consume(TokenType type) -> T* {
-        if (current()->type == type) { return static_cast<T*>(tokens_[tokenIndex_++].get()); }
-        return nullptr;
-    }
+    auto current() -> uptr_iterator<std::vector, Token>& { return iter_; }
+    auto consume(TokenType type) -> b8 { if (iter_->type == type) { ++iter_; return true; } return false; }
+
     template <class... Args>
     auto error(std::format_string<Args...> fmt, Args&&... args) -> std::nullptr_t {
         std::println(fmt, std::forward<Args>(args)...);
@@ -390,6 +602,11 @@ private:
 
 private:
     std::vector<uptr_t<Token>>& tokens_;
-    u64 tokenIndex_;
+    uptr_iterator<std::vector, Token> iter_;
     uptr_t<ModuleNode> moduleNode_;
+
+    std::map<std::string, PrimaryTypeType> functionRetType_;
+    std::map<std::string, PrimaryTypeType> variableType_;
+
+    std::string currentFunctionName_;
 };

@@ -21,6 +21,7 @@ export module codegen;
 import std;
 
 import types;
+import tokens;
 import nodes;
 
 
@@ -28,7 +29,7 @@ export
 class Codegen {
 public:
     Codegen(uptr_t<ModuleNode> const& node)
-        : moduleNode_(node), isMainFunction_(false)
+        : moduleNode_(node)
     {
         context_ = std::make_unique<llvm::LLVMContext>();
         module_ = std::make_unique<llvm::Module>("main", *context_);
@@ -44,8 +45,8 @@ public:
 
 private:
     auto codegen(ModuleNode* node) -> llvm::Module* {
-        for (auto& statement : node->body) {
-            if (!codegen(statement.get())) return nullptr;
+        for (auto& stmt : node->stmts) {
+            if (!codegen(stmt.get())) return nullptr;
         }
         return module_.get();
     }
@@ -64,37 +65,38 @@ private:
     }
 
     auto codegen(FunctionDeclarationNode* node) -> llvm::Function* {
-        if (functions_.contains(node->prototype->name)) {
-            if (!std::ranges::equal(node->prototype->args, functions_[node->prototype->name]->args(), {}, {}, &llvm::Argument::getName))
+        if (functions_.contains(node->name)) {
+            if (!std::ranges::equal(node->vars, functions_[node->name]->args(), {},
+                &std::pair<std::string, PrimaryTypeType>::first, &llvm::Argument::getName))
                 return error("function arguments do not match");
 
-            return functions_[node->prototype->name];
+            return functions_[node->name];
         }
 
-        auto function = createFunction(node->prototype->name, node->prototype->args);
+        auto function = createFunction(node->name, node->vars, node->retType);
         if (!function) return nullptr;
-        functions_[node->prototype->name] = function;
+        functions_[node->name] = function;
         return function;
     }
 
     auto codegen(FunctionDefinitionNode* node) -> llvm::Function* {
         llvm::Function* function;
-        if (functions_.contains(node->prototype->name)) {
-            if (!std::ranges::equal(node->prototype->args, functions_[node->prototype->name]->args(), {}, {}, &llvm::Argument::getName))
+        if (functions_.contains(node->name)) {
+            if (!std::ranges::equal(node->vars, functions_[node->name]->args(), {},
+                &std::pair<std::string, PrimaryTypeType>::first, &llvm::Argument::getName))
                 return error("function arguments do not match");
 
-            function = functions_[node->prototype->name];
+            function = functions_[node->name];
         }
         else {
-            function = createFunction(node->prototype->name, node->prototype->args);
+            function = createFunction(node->name, node->vars, node->retType);
             if (!function) return nullptr;
-            functions_[node->prototype->name] = function;
+
+            functions_[node->name] = function;
         }
 
         if (!function->isDeclaration())
             return error("function is already defined");
-
-        isMainFunction_ = node->prototype->name == "main";
 
         llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*context_, "entry", function);
         builder_->SetInsertPoint(entryBlock);
@@ -106,28 +108,29 @@ private:
             variables_[std::string(arg.getName())] = alloca;
         }
 
-        for (auto& statement : node->body) {
-            if (!codegen(statement.get())) return nullptr;
+        for (auto& stmt : node->stmts) {
+            if (!codegen(stmt.get())) return nullptr;
         };
 
-        isMainFunction_ = false;
         return function;
     }
 
     auto codegen(ExternFunctionDeclarationNode* node) -> llvm::Function* {
-        if (functions_.contains(node->prototype->name)) {
-            if (!std::ranges::equal(node->prototype->args, functions_[node->prototype->name]->args(), {}, {}, &llvm::Argument::getName))
+        if (functions_.contains(node->name)) {
+            if (!std::ranges::equal(node->vars, functions_[node->name]->args(), {},
+                &std::pair<std::string, PrimaryTypeType>::first, &llvm::Argument::getName))
                 return error("function arguments do not match");
 
-            if (!functions_[node->prototype->name]->isDeclaration())
+            if (!functions_[node->name]->isDeclaration())
                 return error("extern function shouldn't be definied");
 
-            return functions_[node->prototype->name];
+            return functions_[node->name];
         }
 
-        auto function = createFunction(node->prototype->name, node->prototype->args);
+        auto function = createFunction(node->name, node->vars, node->retType);
         if (!function) return nullptr;
-        functions_[node->prototype->name] = function;
+
+        functions_[node->name] = function;
         return function;
     }
 
@@ -145,7 +148,7 @@ private:
     }
 
     auto codegen(VariableDeclarationNode* node) -> llvm::AllocaInst* {
-        auto alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->name);
+        auto alloca = builder_->CreateAlloca(getLlvmType(node->type), nullptr, node->name);
         variables_[node->name] = alloca;
         return alloca;
     }
@@ -156,35 +159,254 @@ private:
             alloca = variables_[node->name];
         }
         else {
-            alloca = builder_->CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, node->name);
+            alloca = builder_->CreateAlloca(getLlvmType(node->type), nullptr, node->name);
             variables_[node->name] = alloca;
         }
 
-        if (node->expression->type == ExpressionType::eEmptyExpression) {
-            auto value = llvm::ConstantFP::get(*context_, llvm::APFloat(0.0));
-            return builder_->CreateStore(value, alloca);
+        if (node->expr->type == ExpressionType::eEmptyExpression) {
+            return builder_->CreateStore(getDefault(node->type), alloca);
         }
         else {
-            auto expression = codegen(node->expression.get());
-            if (!expression) return nullptr;
-            return builder_->CreateStore(expression, alloca);
+            auto expr = codegen(node->expr.get());
+            if (!expr) return nullptr;
+
+            return builder_->CreateStore(makeCast(expr, node->expr->retType, node->type), alloca);
+        }
+    }
+
+    auto getDefault(PrimaryTypeType type) -> llvm::Value* {
+        switch (type) {
+        case PrimaryTypeType::eVoid:
+            assert(false && "no default for void");
+        case PrimaryTypeType::eI64: return llvm::ConstantInt::get(builder_->getInt64Ty(), 0, true);
+        case PrimaryTypeType::eI32: return llvm::ConstantInt::get(builder_->getInt32Ty(), 0, true);
+        case PrimaryTypeType::eI16: return llvm::ConstantInt::get(builder_->getInt16Ty(), 0, true);
+        case PrimaryTypeType::eU64: return llvm::ConstantInt::get(builder_->getInt64Ty(), 0, false);
+        case PrimaryTypeType::eU32: return llvm::ConstantInt::get(builder_->getInt32Ty(), 0, false);
+        case PrimaryTypeType::eU16: return llvm::ConstantInt::get(builder_->getInt16Ty(), 0, false);
+        case PrimaryTypeType::eF64: return llvm::ConstantFP::get(builder_->getDoubleTy(), 0);
+        case PrimaryTypeType::eF32: return llvm::ConstantFP::get(builder_->getFloatTy(), 0);
+        default:
+            assert(false && "add case");
+        }
+    }
+
+    auto makeCast(llvm::Value* val, PrimaryTypeType valtype, PrimaryTypeType to) -> llvm::Value* {
+        switch (valtype) {
+        case PrimaryTypeType::eVoid:
+            assert(false && "can't cast void");
+
+        case PrimaryTypeType::eI64:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eU64:
+                return val;
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eU32:
+                return builder_->CreateTrunc(val, builder_->getInt32Ty());
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU16:
+                return builder_->CreateTrunc(val, builder_->getInt16Ty());
+
+            case PrimaryTypeType::eF64:
+                return builder_->CreateSIToFP(val, builder_->getDoubleTy());
+            case PrimaryTypeType::eF32:
+                return builder_->CreateSIToFP(val, builder_->getFloatTy());
+
+            default:
+                assert(false && "add case");
+            }
+
+        case PrimaryTypeType::eI32:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eU64:
+                return builder_->CreateSExt(val, builder_->getInt64Ty());
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eU32:
+                return val;
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU16:
+                return builder_->CreateTrunc(val, builder_->getInt16Ty());
+
+            case PrimaryTypeType::eF64:
+                return builder_->CreateSIToFP(val, builder_->getDoubleTy());
+            case PrimaryTypeType::eF32:
+                return builder_->CreateSIToFP(val, builder_->getFloatTy());
+
+            default:
+                assert(false && "add case");
+            }
+
+        case PrimaryTypeType::eI16:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eU64:
+                return builder_->CreateSExt(val, builder_->getInt64Ty());
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eU32:
+                return builder_->CreateSExt(val, builder_->getInt32Ty());
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU16:
+                return val;
+
+            case PrimaryTypeType::eF64:
+                return builder_->CreateSIToFP(val, builder_->getDoubleTy());
+            case PrimaryTypeType::eF32:
+                return builder_->CreateSIToFP(val, builder_->getFloatTy());
+
+            default:
+                assert(false && "add case");
+            }
+
+        case PrimaryTypeType::eU64:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eU64:
+                return val;
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eU32:
+                return builder_->CreateTrunc(val, builder_->getInt32Ty());
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU16:
+                return builder_->CreateTrunc(val, builder_->getInt16Ty());
+
+            case PrimaryTypeType::eF64:
+                return builder_->CreateUIToFP(val, builder_->getDoubleTy());
+            case PrimaryTypeType::eF32:
+                return builder_->CreateUIToFP(val, builder_->getFloatTy());
+
+            default:
+                assert(false && "add case");
+            }
+
+        case PrimaryTypeType::eU32:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eU64:
+                return builder_->CreateZExt(val, builder_->getInt64Ty());
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eU32:
+                return val;
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU16:
+                return builder_->CreateTrunc(val, builder_->getInt16Ty());
+
+            case PrimaryTypeType::eF64:
+                return builder_->CreateUIToFP(val, builder_->getDoubleTy());
+            case PrimaryTypeType::eF32:
+                return builder_->CreateUIToFP(val, builder_->getFloatTy());
+
+            default:
+                assert(false && "add case");
+            }
+
+        case PrimaryTypeType::eU16:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eU64:
+                return builder_->CreateZExt(val, builder_->getInt64Ty());
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eU32:
+                return builder_->CreateZExt(val, builder_->getInt32Ty());
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU16:
+                return val;
+
+            case PrimaryTypeType::eF64:
+                return builder_->CreateUIToFP(val, builder_->getDoubleTy());
+            case PrimaryTypeType::eF32:
+                return builder_->CreateUIToFP(val, builder_->getFloatTy());
+
+            default:
+                assert(false && "add case");
+            }
+
+        case PrimaryTypeType::eF64:
+        case PrimaryTypeType::eF32:
+            switch (to) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "can't cast void");
+
+            case PrimaryTypeType::eI64:
+                return builder_->CreateFPToSI(val, builder_->getInt64Ty());
+            case PrimaryTypeType::eI32:
+                return builder_->CreateFPToSI(val, builder_->getInt32Ty());
+            case PrimaryTypeType::eI16:
+                return builder_->CreateFPToSI(val, builder_->getInt16Ty());
+
+            case PrimaryTypeType::eU64:
+                return builder_->CreateFPToUI(val, builder_->getInt64Ty());
+            case PrimaryTypeType::eU32:
+                return builder_->CreateFPToUI(val, builder_->getInt32Ty());
+            case PrimaryTypeType::eU16:
+                return builder_->CreateFPToUI(val, builder_->getInt16Ty());
+
+            case PrimaryTypeType::eF64:
+            case PrimaryTypeType::eF32:
+                return val;
+
+            default:
+                assert(false && "add case");
+            }
+
+        default:
+            assert(false && "add case");
+        }
+    }
+
+    auto getLlvmType(PrimaryTypeType type) -> llvm::Type* {
+        switch (type) {
+        case PrimaryTypeType::eVoid:
+            assert(false && "void is not available");
+
+        case PrimaryTypeType::eI64:
+        case PrimaryTypeType::eU64:
+            return builder_->getInt64Ty();
+        case PrimaryTypeType::eI32:
+        case PrimaryTypeType::eU32:
+            return builder_->getInt32Ty();
+        case PrimaryTypeType::eI16:
+        case PrimaryTypeType::eU16:
+            return builder_->getInt16Ty();
+
+        case PrimaryTypeType::eF64:
+            return builder_->getDoubleTy();
+        case PrimaryTypeType::eF32:
+            return builder_->getFloatTy();
+
+        default:
+            assert(false && "add case");
         }
     }
 
     auto codegen(ReturnStatementNode* node) -> llvm::ReturnInst* {
-        // TODO: remove after types are introduced
-        if (isMainFunction_) {
-            auto expression = codegen(node->expression.get());
-            if (!expression) return nullptr;
-
-            return builder_->CreateRet(
-                builder_->CreateCast(llvm::Instruction::CastOps::FPToSI, expression, llvm::Type::getInt32Ty(*context_)));
+        if (node->expr->retType == PrimaryTypeType::eVoid) {
+            return builder_->CreateRet(nullptr);
         }
 
-        auto expression = codegen(node->expression.get());
-        if (!expression) return nullptr;
+        auto expr = codegen(node->expr.get());
+        if (!expr) return nullptr;
 
-        return builder_->CreateRet(expression);
+        return builder_->CreateRet(makeCast(expr, node->expr->retType, node->retType));
     }
 
     auto codegen(ExpressionNode* node) -> llvm::Value* {
@@ -195,8 +417,12 @@ private:
             return codegen(static_cast<FunctionCallExpressionNode*>(node));
         case ExpressionType::eVariableExpression:
             return codegen(static_cast<VariableExpressionNode*>(node));
-        case ExpressionType::eNumberExpression:
-            return codegen(static_cast<NumberExpressionNode*>(node));
+        case ExpressionType::eIntegerExpression:
+            return codegen(static_cast<IntegerExpressionNode*>(node));
+        case ExpressionType::eUnsignedExpression:
+            return codegen(static_cast<UnsignedExpressionNode*>(node));
+        case ExpressionType::eFloatingExpression:
+            return codegen(static_cast<FloatingExpressionNode*>(node));
         case ExpressionType::eEmptyExpression:
             assert(false && "shouldn't be called");
         default:
@@ -208,15 +434,80 @@ private:
         auto lhs = codegen(node->lhs.get());
         auto rhs = codegen(node->rhs.get());
         if (!lhs || !rhs) return nullptr;
-        switch (node->binaryOperator->type) {
+
+        lhs = makeCast(lhs, node->lhs->retType, node->retType);
+        rhs = makeCast(rhs, node->rhs->retType, node->retType);
+
+        switch (node->opType) {
         case BinaryOperatorType::eAddition:
-            return builder_->CreateFAdd(lhs, rhs, "addtmp");
+            switch (node->retType) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "cannot be void");
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU64:
+            case PrimaryTypeType::eU32:
+            case PrimaryTypeType::eU16:
+                  return builder_->CreateAdd(lhs, rhs, "multmp");
+            case PrimaryTypeType::eF64:
+            case PrimaryTypeType::eF32:
+                  return builder_->CreateFAdd(lhs, rhs, "multmp");
+            default:
+                  assert(false && "add case");
+            }
         case BinaryOperatorType::eSubtraction:
-            return builder_->CreateFSub(lhs, rhs, "subtmp");
+            switch (node->retType) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "cannot be void");
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU64:
+            case PrimaryTypeType::eU32:
+            case PrimaryTypeType::eU16:
+                  return builder_->CreateSub(lhs, rhs, "multmp");
+            case PrimaryTypeType::eF64:
+            case PrimaryTypeType::eF32:
+                  return builder_->CreateFSub(lhs, rhs, "multmp");
+            default:
+                  assert(false && "add case");
+            }
         case BinaryOperatorType::eMultiplication:
-            return builder_->CreateFMul(lhs, rhs, "multmp");
+            switch (node->retType) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "cannot be void");
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eI16:
+            case PrimaryTypeType::eU64:
+            case PrimaryTypeType::eU32:
+            case PrimaryTypeType::eU16:
+                  return builder_->CreateMul(lhs, rhs, "multmp");
+            case PrimaryTypeType::eF64:
+            case PrimaryTypeType::eF32:
+                  return builder_->CreateFMul(lhs, rhs, "multmp");
+            default:
+                  assert(false && "add case");
+            }
         case BinaryOperatorType::eDivision:
-            return builder_->CreateFDiv(lhs, rhs, "divtmp");
+            switch (node->retType) {
+            case PrimaryTypeType::eVoid:
+                assert(false && "cannot be void");
+            case PrimaryTypeType::eI64:
+            case PrimaryTypeType::eI32:
+            case PrimaryTypeType::eI16:
+                  return builder_->CreateSDiv(lhs, rhs, "divtmp");
+            case PrimaryTypeType::eU64:
+            case PrimaryTypeType::eU32:
+            case PrimaryTypeType::eU16:
+                  return builder_->CreateUDiv(lhs, rhs, "divtmp");
+            case PrimaryTypeType::eF64:
+            case PrimaryTypeType::eF32:
+                  return builder_->CreateFDiv(lhs, rhs, "divtmp");
+            default:
+                  assert(false && "add case");
+            }
         default:
             assert(false && "add case");
         }
@@ -228,17 +519,18 @@ private:
 
         llvm::Function* fn = functions_[node->name];
 
-        if (node->args.size() != fn->arg_size())
+        if (node->exprs.size() != fn->arg_size())
             return error("incorrect number of arguments");
 
-        std::vector<llvm::Value*> argValues;
-        for (u32 i = 0, e = node->args.size(); i != e; ++i) {
-            auto arg = codegen(node->args[i].get());
-            if (!arg) return nullptr;
-            argValues.push_back(arg);
+        std::vector<llvm::Value*> exprs;
+        for (u32 i = 0, e = node->exprs.size(); i != e; ++i) {
+            auto expr = codegen(node->exprs[i].get());
+            if (!expr) return nullptr;
+
+            exprs.push_back(expr);
         }
 
-        return builder_->CreateCall(fn, argValues, "calltmp");
+        return builder_->CreateCall(fn, exprs, "calltmp");
     }
 
     auto codegen(VariableExpressionNode* node) -> llvm::LoadInst* {
@@ -249,27 +541,45 @@ private:
         return builder_->CreateLoad(alloca->getAllocatedType(), alloca, node->name);
     }
 
-    auto codegen(NumberExpressionNode* node) -> llvm::ConstantFP* {
-        return llvm::ConstantFP::get(*context_, llvm::APFloat(node->value));
+    auto codegen(IntegerExpressionNode* node) -> llvm::ConstantInt* {
+        switch (node->size) {
+        case BitSize::e64: return llvm::ConstantInt::get(*context_, llvm::APInt(64, node->value, 10));
+        case BitSize::e32: return llvm::ConstantInt::get(*context_, llvm::APInt(32, node->value, 10));
+        case BitSize::e16: return llvm::ConstantInt::get(*context_, llvm::APInt(16, node->value, 10));
+        default:
+            assert(false && "add case");
+        }
+    }
+
+    auto codegen(UnsignedExpressionNode* node) -> llvm::ConstantInt* {
+        switch (node->size) {
+        case BitSize::e64: return llvm::ConstantInt::get(*context_, llvm::APInt(64, node->value, 10));
+        case BitSize::e32: return llvm::ConstantInt::get(*context_, llvm::APInt(32, node->value, 10));
+        case BitSize::e16: return llvm::ConstantInt::get(*context_, llvm::APInt(16, node->value, 10));
+        default:
+            assert(false && "add case");
+        }
+    }
+
+    auto codegen(FloatingExpressionNode* node) -> llvm::ConstantFP* {
+        switch (node->size) {
+        case BitSize::e64: return llvm::ConstantFP::get(*context_, llvm::APFloat(llvm::APFloat::IEEEdouble(), node->value));
+        case BitSize::e32: return llvm::ConstantFP::get(*context_, llvm::APFloat(llvm::APFloat::IEEEsingle(), node->value));
+        default:
+            assert(false && "add case");
+        }
     }
 
 private:
-    auto createFunction(std::string_view name, std::vector<std::string> const& args) -> llvm::Function* {
-        // TODO: remove after types are introduced
-        if (name == "main") {
-            if (args.size() != 0)
-                return error("function 'main' shouldn't have arguments");
-            llvm::FunctionType* fnType = llvm::FunctionType::get(builder_->getInt32Ty(), {}, false);
-            llvm::Function* fn = llvm::Function::Create(fnType, llvm::Function::LinkageTypes::ExternalLinkage, "main", *module_);
-            return fn;
-        }
-
-        std::vector<llvm::Type*> fnArgs(args.size(), builder_->getDoubleTy());
-        llvm::FunctionType* fnType = llvm::FunctionType::get(builder_->getDoubleTy(), fnArgs, false);
+    auto createFunction(std::string_view name, std::vector<std::pair<std::string, PrimaryTypeType>> const& vars, PrimaryTypeType retType) -> llvm::Function* {
+        std::vector<llvm::Type*> fnArgs(vars.size());
+        for (u64 i = 0; i < vars.size(); ++i) fnArgs[i] = getLlvmType(vars[i].second);
+        llvm::FunctionType* fnType = llvm::FunctionType::get(getLlvmType(retType), fnArgs, false);
         llvm::Function* fn = llvm::Function::Create(fnType, llvm::Function::LinkageTypes::ExternalLinkage, name, *module_);
-        u32 i = 0; for (auto& arg : fn->args()) arg.setName(args[i++]);
+        u32 i = 0; for (auto& arg : fn->args()) arg.setName(vars[i++].first);
         return fn;
     }
+
     template <class... Args>
     auto error(std::format_string<Args...> fmt, Args&&... args) -> std::nullptr_t {
         std::println(fmt, std::forward<Args>(args)...);
@@ -285,6 +595,4 @@ private:
 
     std::map<std::string, llvm::Function*> functions_;
     std::map<std::string, llvm::AllocaInst*> variables_;
-
-    b8 isMainFunction_;
 };

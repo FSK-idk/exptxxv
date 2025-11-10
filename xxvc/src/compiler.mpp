@@ -20,6 +20,9 @@ public:
     Compiler(b8 printOpt = false) : printOpt_(printOpt) {}
 
     auto exec(std::string program, std::string const& outputFilename) -> b8 {
+        std::string output;
+        llvm::raw_string_ostream os(output);
+
         Lexer lexer(std::move(program));
         if (!lexer.lex()) {
             std::println("failed to lex");
@@ -39,13 +42,15 @@ public:
         }
 
         Codegen codegen(parser.moduleNode());
+
         if (!codegen.codegenModule()) {
+            codegen.module()->print(os, nullptr);
+            std::println("{:=<40}", "= ir =");
+            std::print("{}", output);
             std::println("failed to codegen");
             return false;
         }
 
-        std::string output;
-        llvm::raw_string_ostream os(output);
         codegen.module()->print(os, nullptr);
 
         if (printOpt_) {

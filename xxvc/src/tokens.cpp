@@ -4,9 +4,7 @@ module tokens;
 // Token
 
 auto Token::Create(TokenType type) -> uptr_t<Token> {
-    return uptr_t<Token>{
-        new Token{ type }
-    };
+    return make_uptr(Token{ type });
 }
 
 auto Token::Destroy(Token* token) -> void {
@@ -28,31 +26,23 @@ auto Token::Destroy(Token* token) -> void {
 // IdentifierToken
 
 auto IdentifierToken::Create(std::string name) -> uptr_t<IdentifierToken> {
-    return uptr_t<IdentifierToken> {
-        new IdentifierToken{ { TokenType::eIdentifier }, std::move(name) }
-    };
+    return make_uptr(IdentifierToken{ { TokenType::eIdentifier }, std::move(name) });
 }
 
 // IntegerToken
 
 auto IntegerToken::Create(std::string value, BitSize size) -> uptr_t<IntegerToken> {
-    return uptr_t<IntegerToken> {
-        new IntegerToken { { TokenType::eInteger }, std::move(value), size }
-    };
+    return make_uptr(IntegerToken{ { TokenType::eInteger }, std::move(value), size });
 }
 
 // UnsignedToken
 
 auto UnsignedToken::Create(std::string value, BitSize size) -> uptr_t<UnsignedToken> {
-    return uptr_t<UnsignedToken> {
-        new UnsignedToken{ { TokenType::eUnsigned }, std::move(value), size }
-    };
+    return make_uptr(UnsignedToken{ { TokenType::eUnsigned }, std::move(value), size });
 }
 
 // FloatingToken
 
 auto FloatingToken::Create(std::string value, BitSize size) -> uptr_t<FloatingToken> {
-    return uptr_t<FloatingToken> {
-        new FloatingToken{ { TokenType::eFloating }, std::move(value), size }
-    };
+    return make_uptr(FloatingToken{ { TokenType::eFloating }, std::move(value), size });
 }

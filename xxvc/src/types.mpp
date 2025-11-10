@@ -59,9 +59,37 @@ using SelfDestructor = SelfDestructorImpl<T>::type;
 template <class T>
 using uptr_t = std::unique_ptr<T, SelfDestructor<T>>;
 
-template<class T, class Ptr>
-auto uptr_cast(Ptr&& ptr) -> uptr_t<T> {
+template <class T>
+auto make_uptr(T&& t) -> uptr_t<T> {
+    return uptr_t<T> {
+        new T{ std::forward<T>(t) }
+    };
+}
+
+template<class T, class D>
+auto uptr_cast(uptr_t<D> ptr) -> uptr_t<T> {
     return uptr_t<T>{ static_cast<T*>(ptr.release()) };
 }
+
+template <template <class...> class C, class T>
+class uptr_iterator {
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type   = std::ptrdiff_t;
+    using value_type        = uptr_t<T>::element_type;
+    using pointer           = uptr_t<T>::element_type*;
+    using reference         = uptr_t<T>&;
+
+    explicit uptr_iterator(C<uptr_t<T>>::iterator iter) : iter_(iter) {}
+
+    reference operator*() const { return *iter_; }
+    pointer operator->() { return iter_->get(); }
+    uptr_iterator& operator++() { ++iter_; return *this; }  
+    uptr_iterator operator++(int) { return uptr_iterator(iter_++); }
+    friend b8 operator== (uptr_iterator const& a, uptr_iterator const& b) { return a.iter_ == b.iter_; };
+
+private:
+    C<uptr_t<T>>::iterator iter_;
+};
 
 }

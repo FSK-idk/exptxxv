@@ -3,23 +3,59 @@ export module nodes;
 import std;
 
 import types;
+import tokens;
 
+
+export {
+
+enum class ModuleStatementType;
+enum class FunctionStatementType;
+enum class ExpressionType;
+enum class BinaryOperatorType;
+enum class PrimaryTypeType;
+
+struct ModuleNode;
+
+struct ModuleStatementNode;
+struct FunctionDeclarationNode;
+struct FunctionDefinitionNode;
+struct ExternFunctionDeclarationNode;
+
+struct FunctionStatementNode;
+struct VariableDeclarationNode;
+struct VariableDefinitionNode;
+struct ReturnStatementNode;
+
+struct ExpressionNode;
+struct BinaryExpressionNode;
+struct FunctionCallExpressionNode;
+struct VariableExpressionNode;
+struct IntegerExpressionNode;
+struct UnsignedExpressionNode;
+struct FloatingExpressionNode;
+struct EmptyExpressionNode;
+
+struct FunctionStatementBlockSeminode;
+struct ExpressionBlockSeminode;
+struct NonEmptyExpressionListSeminode;
+struct NonEmptyExpressionSeminode;
+struct PrimaryExpressionSeminode;
+struct BinaryOperatorSeminode;
+struct FunctionPrototypeSeminode;
+struct FunctionTypeSeminode;
+struct VariablePrototypeListSeminode;
+struct VariablePrototypeSeminode;
+struct PrimaryTypeSeminode;
+
+}
+
+// Enums
 
 export
-enum class BinaryOperatorType {
-    eAddition,
-    eSubtraction,
-    eMultiplication,
-    eDivision,
-};
-
-export
-enum class ExpressionType {
-    eBinaryExpression,
-    eFunctionCallExpression,
-    eVariableExpression,
-    eNumberExpression,
-    eEmptyExpression,
+enum class ModuleStatementType {
+    eFunctionDeclaration,
+    eFunctionDefinition,
+    eExternFunctionDeclaration,
 };
 
 export
@@ -30,95 +66,48 @@ enum class FunctionStatementType {
 };
 
 export
-enum class ModuleStatementType {
-    eFunctionDeclaration,
-    eFunctionDefinition,
-    eExternFunctionDeclaration,
+enum class ExpressionType {
+    eBinaryExpression,
+    eFunctionCallExpression,
+    eVariableExpression,
+    eIntegerExpression,
+    eUnsignedExpression,
+    eFloatingExpression,
+    eEmptyExpression,
 };
+
+export
+enum class BinaryOperatorType {
+    eAddition,
+    eSubtraction,
+    eMultiplication,
+    eDivision,
+};
+
+export
+enum class PrimaryTypeType {
+    eVoid,
+    eI64,
+    eI32,
+    eI16,
+    eU64,
+    eU32,
+    eU16,
+    eF64,
+    eF32,
+};
+
+// Node
 
 export
 struct Node {};
 
-export
-struct BinaryOperatorNode : Node {
-    static auto Create(BinaryOperatorType type) -> uptr_t<BinaryOperatorNode>;
-    BinaryOperatorType type;
-};
+// Nodes
 
 export
-struct ExpressionNode : Node {
-    static auto Destroy(ExpressionNode* node) -> void;
-    ExpressionType type;
-};
-
-template <>
-struct enable_self_destroy<ExpressionNode> : std::true_type {};
-
-export
-struct BinaryExpressionNode : ExpressionNode {
-    static auto Create(uptr_t<BinaryOperatorNode> binaryOperator, uptr_t<ExpressionNode> lhs, uptr_t<ExpressionNode> rhs) -> uptr_t<BinaryExpressionNode>;
-    uptr_t<BinaryOperatorNode> binaryOperator;
-    uptr_t<ExpressionNode> lhs;
-    uptr_t<ExpressionNode> rhs;
-};
-
-export
-struct FunctionCallExpressionNode : ExpressionNode {
-    static auto Create(std::string name, std::vector<uptr_t<ExpressionNode>> args) -> uptr_t<FunctionCallExpressionNode>;
-    std::string name;
-    std::vector<uptr_t<ExpressionNode>> args;
-};
-
-export
-struct VariableExpressionNode : ExpressionNode {
-    static auto Create(std::string name) -> uptr_t<VariableExpressionNode>;
-    std::string name;
-};
-
-export
-struct NumberExpressionNode : ExpressionNode {
-    static auto Create(f64 value) -> uptr_t<NumberExpressionNode>;
-    f64 value;
-};
-
-export
-struct EmptyExpressionNode : ExpressionNode {
-    static auto Create() -> uptr_t<EmptyExpressionNode>;
-};
-
-export
-struct FunctionStatementNode : Node {
-    static auto Destroy(FunctionStatementNode* node) -> void;
-    FunctionStatementType type;
-};
-
-template <>
-struct enable_self_destroy<FunctionStatementNode> : std::true_type {};
-
-export
-struct VariableDeclarationNode : FunctionStatementNode {
-    static auto Create(std::string name) -> uptr_t<VariableDeclarationNode>;
-    std::string name;
-};
-
-export
-struct VariableDefinitionNode : FunctionStatementNode {
-    static auto Create(std::string name, uptr_t<ExpressionNode> expression) -> uptr_t<VariableDefinitionNode>;
-    std::string name;
-    uptr_t<ExpressionNode> expression;
-};
-
-export
-struct ReturnStatementNode : FunctionStatementNode {
-    static auto Create(uptr_t<ExpressionNode> expression) -> uptr_t<ReturnStatementNode>;
-    uptr_t<ExpressionNode> expression;
-};
-
-export
-struct FunctionPrototypeNode : Node {
-    static auto Create(std::string name, std::vector<std::string> args) -> uptr_t<FunctionPrototypeNode>;
-    std::string name;
-    std::vector<std::string> args;
+struct ModuleNode : Node {
+    static auto Create(std::vector<uptr_t<ModuleStatementNode>> stmts) -> uptr_t<ModuleNode>;
+    std::vector<uptr_t<ModuleStatementNode>> stmts;
 };
 
 export
@@ -132,25 +121,194 @@ struct enable_self_destroy<ModuleStatementNode> : std::true_type {};
 
 export
 struct FunctionDeclarationNode : ModuleStatementNode {
-    static auto Create(uptr_t<FunctionPrototypeNode> prototype) -> uptr_t<FunctionDeclarationNode>;
-    uptr_t<FunctionPrototypeNode> prototype;
+    static auto Create(uptr_t<FunctionPrototypeSeminode> proto) -> uptr_t<FunctionDeclarationNode>;
+    std::string name;
+    std::vector<std::pair<std::string, PrimaryTypeType>> vars;
+    PrimaryTypeType retType;
 };
 
 export
 struct FunctionDefinitionNode : ModuleStatementNode {
-    static auto Create(uptr_t<FunctionPrototypeNode> prototype, std::vector<uptr_t<FunctionStatementNode>> body) -> uptr_t<FunctionDefinitionNode>;
-    uptr_t<FunctionPrototypeNode> prototype;
-    std::vector<uptr_t<FunctionStatementNode>> body;
+    static auto Create(uptr_t<FunctionPrototypeSeminode> proto, uptr_t<FunctionStatementBlockSeminode> block) -> uptr_t<FunctionDefinitionNode>;
+    std::string name;
+    std::vector<std::pair<std::string, PrimaryTypeType>> vars;
+    PrimaryTypeType retType;
+    std::vector<uptr_t<FunctionStatementNode>> stmts;
 };
 
 export
 struct ExternFunctionDeclarationNode : ModuleStatementNode {
-    static auto Create(uptr_t<FunctionPrototypeNode> prototype) -> uptr_t<ExternFunctionDeclarationNode>;
-    uptr_t<FunctionPrototypeNode> prototype;
+    static auto Create(uptr_t<FunctionPrototypeSeminode> proto) -> uptr_t<ExternFunctionDeclarationNode>;
+    std::string name;
+    std::vector<std::pair<std::string, PrimaryTypeType>> vars;
+    PrimaryTypeType retType;
 };
 
 export
-struct ModuleNode : Node {
-    static auto Create(std::vector<uptr_t<ModuleStatementNode>> body) -> uptr_t<ModuleNode>;
-    std::vector<uptr_t<ModuleStatementNode>> body;
+struct FunctionStatementNode : Node {
+    static auto Destroy(FunctionStatementNode* node) -> void;
+    FunctionStatementType type;
 };
+
+template <>
+struct enable_self_destroy<FunctionStatementNode> : std::true_type {};
+
+export
+struct VariableDeclarationNode : FunctionStatementNode {
+    static auto Create(uptr_t<VariablePrototypeSeminode> proto) -> uptr_t<VariableDeclarationNode>;
+    std::string name;
+    PrimaryTypeType type;
+};
+
+export
+struct VariableDefinitionNode : FunctionStatementNode {
+    static auto Create(uptr_t<VariablePrototypeSeminode> proto, uptr_t<ExpressionBlockSeminode> block) -> uptr_t<VariableDefinitionNode>;
+    std::string name;
+    PrimaryTypeType type;
+    uptr_t<ExpressionNode> expr;
+};
+
+export
+struct ReturnStatementNode : FunctionStatementNode {
+    static auto Create(PrimaryTypeType retType, uptr_t<ExpressionNode> expr) -> uptr_t<ReturnStatementNode>;
+    PrimaryTypeType retType;
+    uptr_t<ExpressionNode> expr;
+};
+
+export
+struct ExpressionNode : Node {
+    static auto Create(uptr_t<NonEmptyExpressionSeminode> expr) -> uptr_t<ExpressionNode>;
+    static auto Create(uptr_t<PrimaryExpressionSeminode> expr) -> uptr_t<ExpressionNode>;
+    static auto Destroy(ExpressionNode* node) -> void;
+    ExpressionType type;
+    PrimaryTypeType retType;
+};
+
+template <>
+struct enable_self_destroy<ExpressionNode> : std::true_type {};
+
+export
+struct BinaryExpressionNode : ExpressionNode {
+    static auto Create(PrimaryTypeType retType, uptr_t<BinaryOperatorSeminode> op, uptr_t<NonEmptyExpressionSeminode> lhs, uptr_t<NonEmptyExpressionSeminode> rhs) -> uptr_t<BinaryExpressionNode>;
+    BinaryOperatorType opType;
+    uptr_t<ExpressionNode> lhs;
+    uptr_t<ExpressionNode> rhs;
+};
+
+export
+struct FunctionCallExpressionNode : ExpressionNode {
+    static auto Create(PrimaryTypeType retType, std::string name, uptr_t<NonEmptyExpressionListSeminode> list) -> uptr_t<FunctionCallExpressionNode>;
+    std::string name;
+    std::vector<uptr_t<ExpressionNode>> exprs;
+};
+
+export
+struct VariableExpressionNode : ExpressionNode {
+    static auto Create(PrimaryTypeType retType, std::string name) -> uptr_t<VariableExpressionNode>;
+    std::string name;
+};
+
+export
+struct IntegerExpressionNode : ExpressionNode {
+    static auto Create(std::string value, BitSize size) -> uptr_t<IntegerExpressionNode>;
+    std::string value;
+    BitSize size;
+};
+
+export
+struct UnsignedExpressionNode : ExpressionNode {
+    static auto Create(std::string value, BitSize size) -> uptr_t<UnsignedExpressionNode>;
+    std::string value;
+    BitSize size;
+};
+
+export
+struct FloatingExpressionNode : ExpressionNode {
+    static auto Create(std::string value, BitSize size) -> uptr_t<FloatingExpressionNode>;
+    std::string value;
+    BitSize size;
+};
+
+export
+struct EmptyExpressionNode : ExpressionNode {
+    static auto Create() -> uptr_t<EmptyExpressionNode>;
+};
+
+// Seminodes
+
+export
+struct FunctionStatementBlockSeminode : Node {
+    static auto Create(std::vector<uptr_t<FunctionStatementNode>> stmts) -> uptr_t<FunctionStatementBlockSeminode>;
+    std::vector<uptr_t<FunctionStatementNode>> stmts;
+};
+
+export
+struct ExpressionBlockSeminode : Node {
+    static auto Create(uptr_t<ExpressionNode> expr) -> uptr_t<ExpressionBlockSeminode>;
+    uptr_t<ExpressionNode> expr;
+};
+
+export
+struct NonEmptyExpressionListSeminode : Node {
+    static auto Create(std::vector<uptr_t<NonEmptyExpressionSeminode>> exprs) -> uptr_t<NonEmptyExpressionListSeminode>;
+    std::vector<uptr_t<ExpressionNode>> exprs;
+};
+
+export
+struct NonEmptyExpressionSeminode : Node {
+    static auto Create(uptr_t<ExpressionNode> expr) -> uptr_t<NonEmptyExpressionSeminode>;
+    uptr_t<ExpressionNode> expr;
+};
+
+export
+struct PrimaryExpressionSeminode : Node {
+    static auto Create(uptr_t<FunctionCallExpressionNode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    static auto Create(uptr_t<VariableExpressionNode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    static auto Create(uptr_t<IntegerExpressionNode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    static auto Create(uptr_t<UnsignedExpressionNode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    static auto Create(uptr_t<FloatingExpressionNode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    static auto Create(uptr_t<EmptyExpressionNode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    static auto Create(uptr_t<NonEmptyExpressionSeminode> expr) -> uptr_t<PrimaryExpressionSeminode>;
+    uptr_t<ExpressionNode> expr;
+};
+
+export
+struct BinaryOperatorSeminode : Node {
+    static auto Create(BinaryOperatorType type) -> uptr_t<BinaryOperatorSeminode>;
+    BinaryOperatorType type;
+};
+
+export
+struct FunctionPrototypeSeminode : Node {
+    static auto Create(std::string name, uptr_t<FunctionTypeSeminode> type) -> uptr_t<FunctionPrototypeSeminode>;
+    std::string name;
+    std::vector<std::pair<std::string, PrimaryTypeType>> vars;
+    PrimaryTypeType retType;
+};
+
+export
+struct FunctionTypeSeminode : Node {
+    static auto Create(uptr_t<VariablePrototypeListSeminode> list, uptr_t<PrimaryTypeSeminode> type) -> uptr_t<FunctionTypeSeminode>;
+    std::vector<std::pair<std::string, PrimaryTypeType>> vars;
+    PrimaryTypeType retType;
+};
+
+export
+struct VariablePrototypeListSeminode: Node {
+    static auto Create(std::vector<uptr_t<VariablePrototypeSeminode>> protos) -> uptr_t<VariablePrototypeListSeminode>;
+    std::vector<std::pair<std::string, PrimaryTypeType>> vars;
+};
+
+export
+struct VariablePrototypeSeminode : Node {
+    static auto Create(std::string name, uptr_t<PrimaryTypeSeminode> type) -> uptr_t<VariablePrototypeSeminode>;
+    std::string name;
+    PrimaryTypeType type;
+};
+
+export
+struct PrimaryTypeSeminode: Node {
+    static auto Create(PrimaryTypeType type) -> uptr_t<PrimaryTypeSeminode>;
+    PrimaryTypeType type;
+};
+

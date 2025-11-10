@@ -1,14 +1,14 @@
-take2: ();
+take2: () -> i64;
 
-mult2: (x) {
+mult2: (x: f64) -> f64 {
     return x * take2();
 };
 
-take2: () {
-    return 2f;
+take2: () -> i64 {
+    return 2;
 };
 
-main: () {
-    varb: { 4f };
-    return mult2(1f) + varb;
+main: () -> i32 {
+    varb: f64 { 4f };
+    return mult2(2f) / varb;
 };
